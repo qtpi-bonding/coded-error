@@ -6,6 +6,9 @@ mod fingerprint;
 mod info;
 mod overrides;
 
+#[cfg(feature = "grpc")]
+pub mod grpc;
+
 #[cfg(feature = "anyhow")]
 mod carry;
 
