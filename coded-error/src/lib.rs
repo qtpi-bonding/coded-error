@@ -15,6 +15,9 @@ pub mod http;
 #[cfg(feature = "cli")]
 pub mod cli;
 
+#[cfg(feature = "mcp")]
+pub mod mcp;
+
 #[cfg(feature = "anyhow")]
 mod carry;
 
