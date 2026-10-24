@@ -3,12 +3,14 @@
 mod class;
 mod code;
 mod fingerprint;
+mod info;
 mod overrides;
 
 pub use class::{ErrorClass, ParseClassError};
 pub use code::{check_codes, is_valid_code, UNKNOWN_CODE};
 pub use coded_error_derive::CodedError;
 pub use fingerprint::fingerprint;
+pub use info::ErrorInfo;
 pub use overrides::{GrpcCode, McpCode, Overrides};
 
 /// An error with a stable, namespaced code and a class.
