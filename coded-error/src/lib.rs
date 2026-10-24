@@ -9,6 +9,12 @@ mod overrides;
 #[cfg(feature = "grpc")]
 pub mod grpc;
 
+#[cfg(feature = "http")]
+pub mod http;
+
+#[cfg(feature = "cli")]
+pub mod cli;
+
 #[cfg(feature = "anyhow")]
 mod carry;
 
