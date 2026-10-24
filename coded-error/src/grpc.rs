@@ -80,7 +80,9 @@ impl From<&Status> for CodedStatus {
 /// Client side: turn a received status into an anyhow error the readers
 /// recognise (`from_anyhow`, `exit_code_anyhow`, `to_mcp_error_anyhow`,
 /// `to_status_anyhow`), carrying the server's code and class. A status
-/// without coded metadata reads as `unknown`. Display is the status message.
+/// without coded metadata is a plain uncoded error (`facts_anyhow` gives
+/// `unknown`). Codes are interned first-come, at most 4096 distinct codes of at
+/// most 128 bytes; beyond that a new code reads as `unknown` with its class kept. Display is the status message.
 #[cfg(feature = "anyhow")]
 pub fn from_status(status: &Status) -> anyhow::Error {
     from_coded_status(&CodedStatus::from(status), status.message())

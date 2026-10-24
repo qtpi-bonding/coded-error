@@ -136,14 +136,17 @@ mod remote {
     fn exit_code_matches_original() {
         use coded_error::cli::exit_code_anyhow;
         use coded_error::into_anyhow;
-        for e in [E::Missing, E::Down, E::Internal, E::Unknown] {
-            let want = exit_code_anyhow(&into_anyhow(match e {
-                E::Missing => E::Missing,
-                E::Down => E::Down,
-                E::Internal => E::Internal,
+        fn make(i: usize) -> E {
+            match i {
+                0 => E::Missing,
+                1 => E::Down,
+                2 => E::Internal,
                 _ => E::Unknown,
-            }));
-            let got = exit_code_anyhow(&from_status(&to_status(&e, "s")));
+            }
+        }
+        for i in 0..4 {
+            let want = exit_code_anyhow(&into_anyhow(make(i)));
+            let got = exit_code_anyhow(&from_status(&to_status(&make(i), "s")));
             assert_eq!(got, want);
         }
         assert_eq!(

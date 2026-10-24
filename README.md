@@ -58,11 +58,15 @@ A client that receives a coded `tonic::Status` converts it with
 `coded_error::grpc::from_status(&status)` (features `grpc` + `anyhow`). The
 result is an anyhow error whose `Coded` carries the server's code and class,
 so `from_anyhow`, `cli::exit_code_anyhow` and `mcp::to_mcp_error_anyhow` see
-them exactly as for a local typed error. The code is interned into the
-`&'static str` in `Facts` (leaked once per distinct valid code, capped at
-4096); a malformed code reads as `unknown`. A status with no coded metadata
-is a plain uncoded error. `coded_error::from_remote(code, class, message)` is
-the transport-neutral form.
+them exactly as for a local typed error. A status with no coded metadata is a
+plain uncoded error. `coded_error::from_remote(code, class, message)` is the
+transport-neutral form.
+
+`Facts.code` is a `&'static str`, so a remote code is interned: leaked once per
+distinct valid code. The set is first-come and bounded: at most 4096 distinct
+codes of at most 128 bytes. Past that, or for a malformed code, a new code
+reads as `unknown` with its class kept and the set never grows. A hostile peer
+could fill the set, so treat remote codes as advisory.
 
 Consume the crate by pinning a git revision in `Cargo.toml`:
 

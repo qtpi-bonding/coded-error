@@ -97,33 +97,76 @@ impl fmt::Display for Remote {
 
 impl Error for Remote {}
 
-/// Most distinct remote codes kept for the process lifetime. Real code
-/// vocabularies are small; the cap bounds what a hostile peer can make us hold.
+/// Most distinct remote codes kept for the process lifetime, first come first
+/// kept. Past it, a new code reads as `unknown` (class kept) and the set never
+/// grows; codes already interned keep working.
 const MAX_REMOTE_CODES: usize = 4096;
 
-/// `Facts.code` is `&'static str`, so a code that arrives at runtime is
-/// interned: leaked once per distinct value and reused after. Invalid codes
-/// (grammar, see `is_valid_code`) and codes past the cap read as `unknown`.
-fn intern_code(code: &str) -> &'static str {
-    use std::collections::HashSet;
-    use std::sync::{Mutex, OnceLock};
-    static SEEN: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
-    if code == UNKNOWN_CODE || !crate::is_valid_code(code) {
+/// Longest remote code interned, in bytes. Longer codes read as `unknown`.
+/// Together with `MAX_REMOTE_CODES` this bounds the leaked memory.
+const MAX_REMOTE_CODE_LEN: usize = 128;
+
+type Interned = std::sync::Mutex<std::collections::HashSet<&'static str>>;
+
+fn intern_into(set: &Interned, code: &str, cap: usize) -> &'static str {
+    if code == UNKNOWN_CODE || code.len() > MAX_REMOTE_CODE_LEN || !crate::is_valid_code(code) {
         return UNKNOWN_CODE;
     }
-    let mut seen = SEEN
-        .get_or_init(|| Mutex::new(HashSet::new()))
-        .lock()
-        .unwrap_or_else(|p| p.into_inner());
+    let mut seen = set.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(s) = seen.get(code) {
         return s;
     }
-    if seen.len() >= MAX_REMOTE_CODES {
+    if seen.len() >= cap {
         return UNKNOWN_CODE;
     }
     let leaked: &'static str = Box::leak(code.to_owned().into_boxed_str());
     seen.insert(leaked);
     leaked
+}
+
+/// `Facts.code` is `&'static str`, so a code that arrives at runtime is
+/// interned: leaked once per distinct value and reused after. Invalid codes
+/// (grammar, see `is_valid_code`), codes over 128 bytes and codes past the
+/// 4096-code cap read as `unknown`.
+fn intern_code(code: &str) -> &'static str {
+    static SEEN: std::sync::OnceLock<Interned> = std::sync::OnceLock::new();
+    intern_into(SEEN.get_or_init(Default::default), code, MAX_REMOTE_CODES)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn same_code_same_pointer() {
+        let set = Interned::default();
+        let a = intern_into(&set, "t.intern.same", 4);
+        let b = intern_into(&set, &String::from("t.intern.same"), 4);
+        assert_eq!(a, "t.intern.same");
+        assert!(std::ptr::eq(a, b));
+    }
+
+    #[test]
+    fn cap_is_first_come_and_set_never_grows() {
+        let set = Interned::default();
+        assert_eq!(intern_into(&set, "t.cap.one", 2), "t.cap.one");
+        assert_eq!(intern_into(&set, "t.cap.two", 2), "t.cap.two");
+        assert_eq!(intern_into(&set, "t.cap.three", 2), UNKNOWN_CODE);
+        assert_eq!(set.lock().unwrap().len(), 2);
+        // already-interned codes still resolve past the cap
+        assert_eq!(intern_into(&set, "t.cap.one", 2), "t.cap.one");
+    }
+
+    #[test]
+    fn over_long_code_reads_unknown() {
+        let set = Interned::default();
+        let ok = format!("t.len.{}", "a".repeat(MAX_REMOTE_CODE_LEN - 6));
+        assert_eq!(ok.len(), MAX_REMOTE_CODE_LEN);
+        assert_eq!(intern_into(&set, &ok, 4), ok);
+        let long = format!("{ok}a");
+        assert_eq!(intern_into(&set, &long, 4), UNKNOWN_CODE);
+        assert_eq!(set.lock().unwrap().len(), 1);
+    }
 }
 
 /// Raise a failure that happened on the other side of a boundary into anyhow
@@ -133,7 +176,10 @@ fn intern_code(code: &str) -> &'static str {
 /// Design: the code is interned into the existing `Facts` (see `intern_code`)
 /// rather than adding an owned-code variant, so `Facts` stays `Copy` and no
 /// reader changes. A missing or malformed `code` becomes `unknown` and a
-/// missing `class` becomes `Unknown`. With neither, the result is a plain
+/// missing `class` becomes `Unknown`. Interning is first-come: the set holds at
+/// most 4096 distinct codes of at most 128 bytes; past that a new code reads as
+/// `unknown` with its class kept (a peer can fill the set, so treat the code as
+/// advisory for untrusted peers). With neither, the result is a plain
 /// (uncoded) error. Display is `message`.
 pub fn from_remote(
     code: Option<&str>,

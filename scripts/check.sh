@@ -2,7 +2,7 @@
 # Every cargo call goes through cargo-slot (max 2 heavy compiles machine-wide).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-SLOT="${CARGO_SLOT:-/Users/aicoder/Documents/systematic-action/scripts/cargo-slot}"
+SLOT="${CARGO_SLOT:-$(command -v cargo-slot || true)}"
 [ -x "$SLOT" ] || SLOT=""   # CI and other machines run cargo directly
 
 $SLOT cargo fmt --all -- --check
