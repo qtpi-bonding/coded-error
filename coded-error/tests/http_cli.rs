@@ -1,8 +1,11 @@
 #![cfg(any(feature = "http", feature = "cli"))]
-use coded_error::{CodedError, ErrorClass};
+use coded_error::CodedError;
+#[cfg(feature = "http")]
+use coded_error::ErrorClass;
 
 #[derive(Debug, thiserror::Error, CodedError)]
 #[coded(namespace = "test.http")]
+#[allow(dead_code)]
 enum E {
     #[error("bad")]
     #[coded(code = "bad", class = Logical)]
@@ -30,6 +33,26 @@ fn http_defaults_and_override() {
     assert_eq!(
         body.fingerprint,
         coded_error::fingerprint("test.http.bug", ErrorClass::Infrastructure, "s")
+    );
+}
+
+#[cfg(all(feature = "http", feature = "anyhow"))]
+#[test]
+fn http_anyhow_forms() {
+    use coded_error::http::to_http_anyhow;
+    use coded_error::into_anyhow;
+
+    let missing = to_http_anyhow(&into_anyhow(E::Missing).context("c"), "s");
+    assert_eq!(missing.0, 404);
+    assert_eq!(missing.1.code, "test.http.missing");
+
+    let unknown = to_http_anyhow(&anyhow::anyhow!("boom"), "s");
+    assert_eq!(unknown.0, 500);
+    assert_eq!(unknown.1.code, "unknown");
+    assert_eq!(unknown.1.class, ErrorClass::Unknown);
+    assert_eq!(
+        unknown.1.fingerprint,
+        coded_error::fingerprint("unknown", ErrorClass::Unknown, "s")
     );
 }
 

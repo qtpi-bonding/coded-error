@@ -15,6 +15,12 @@ enum E {
     #[error("db down")]
     #[coded(code = "db_down", class = Transient)]
     Down,
+    #[error("internal failure")]
+    #[coded(code = "internal_failure", class = Infrastructure)]
+    Internal,
+    #[error("unknown failure")]
+    #[coded(code = "unknown_failure", class = Unknown)]
+    Unknown,
 }
 
 #[test]
@@ -22,6 +28,8 @@ fn class_defaults_and_override() {
     assert_eq!(to_status(&E::Missing, "m").code(), Code::InvalidArgument);
     assert_eq!(to_status(&E::NotFound, "m").code(), Code::NotFound);
     assert_eq!(to_status(&E::Down, "m").code(), Code::Unavailable);
+    assert_eq!(to_status(&E::Internal, "m").code(), Code::Internal);
+    assert_eq!(to_status(&E::Unknown, "m").code(), Code::Unknown);
 }
 
 #[test]
@@ -47,6 +55,11 @@ fn anyhow_form_and_unknown_fallback() {
     let u = to_status_anyhow(&anyhow::anyhow!("boom"), "m");
     assert_eq!(u.code(), Code::Unknown);
     assert_eq!(CodedStatus::from(&u).code.as_deref(), Some("unknown"));
+    assert_eq!(CodedStatus::from(&u).class, Some(ErrorClass::Unknown));
+    assert_eq!(
+        CodedStatus::from(&u).fingerprint.as_deref(),
+        Some(fingerprint("unknown", ErrorClass::Unknown, "m").as_str())
+    );
 }
 
 #[cfg(feature = "anyhow")]
