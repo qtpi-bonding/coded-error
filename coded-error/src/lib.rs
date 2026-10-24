@@ -18,6 +18,12 @@ pub mod cli;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 
+#[cfg(feature = "proto")]
+pub mod proto;
+
+#[cfg(feature = "sqlx")]
+pub mod sqlx;
+
 #[cfg(feature = "anyhow")]
 mod carry;
 

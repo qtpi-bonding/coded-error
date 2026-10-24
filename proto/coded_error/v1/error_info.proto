@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package coded_error.v1;
+
+// class is a string (lowercase ErrorClass name), not an enum, so the
+// proto3-JSON is identical to the serde form.
+message ErrorInfo {
+  string code = 1;
+  string class = 2;
+  string fingerprint = 3;
+}
