@@ -1,0 +1,13 @@
+[package]
+name = "coded-error-compat-thiserror1"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+coded-error = { path = "../../coded-error" }
+thiserror = "1.0"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
