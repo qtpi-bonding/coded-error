@@ -3,8 +3,11 @@ use crate::{fingerprint, CodedError, ErrorClass, Facts, GrpcCode};
 use tonic::metadata::MetadataValue;
 use tonic::{Code, Status};
 
+/// Metadata key carrying the stable error code.
 pub const CODE_KEY: &str = "x-error-code";
+/// Metadata key carrying the error class.
 pub const CLASS_KEY: &str = "x-error-class";
+/// Metadata key carrying the error fingerprint.
 pub const FINGERPRINT_KEY: &str = "x-error-fingerprint";
 
 fn default_code(class: ErrorClass) -> GrpcCode {
@@ -39,6 +42,7 @@ fn status_from(facts: Facts, message: String, source: &str) -> Status {
     status
 }
 
+/// Convert a coded error into a gRPC status with coded metadata.
 pub fn to_status<E: CodedError + ?Sized>(e: &E, source: &str) -> Status {
     status_from(Facts::of(e), e.to_string(), source)
 }

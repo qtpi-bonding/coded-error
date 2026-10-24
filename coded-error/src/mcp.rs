@@ -10,6 +10,7 @@ fn from_facts(facts: Facts, message: String, source: &str) -> ErrorData {
     ErrorData::new(ErrorCode(code as i32), message, data)
 }
 
+/// Convert a coded error into an MCP error with structured error information.
 pub fn to_mcp_error<E: CodedError + ?Sized>(e: &E, source: &str) -> ErrorData {
     from_facts(Facts::of(e), e.to_string(), source)
 }

@@ -39,10 +39,12 @@ impl ExitTable {
     }
 }
 
+/// Map an error's class to the standard sysexits-based exit code.
 pub fn exit_code<E: CodedError + ?Sized>(e: &E) -> u8 {
     ExitTable::SYSEXITS.code_for(e.class())
 }
 
+/// Map an error's class to an exit code using a caller-provided table.
 pub fn exit_code_with<E: CodedError + ?Sized>(e: &E, table: &ExitTable) -> u8 {
     table.code_for(e.class())
 }

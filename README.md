@@ -5,17 +5,17 @@ losing ordinary Rust error handling. It separates an error's **code** from its
 **class**, supports typed context, and provides integrations for the common
 wire and error-reporting formats.
 
-Implement the `CodedError` trait (or derive `ErrorClass` for an enum):
+Implement the `CodedError` trait (or derive `CodedError` for an enum):
 
 ```rust
-use coded_error::ErrorClass;
-
-#[derive(Debug, ErrorClass)]
-#[error_class(code = "billing.invoice")]
+#[derive(Debug, thiserror::Error, coded_error::CodedError)]
+#[coded(namespace = "billing.invoice")]
 enum InvoiceError {
-    #[error_class(code = "missing")]
+    #[error("missing")]
+    #[coded(code = "missing", class = Logical)]
     Missing,
 }
+
 ```
 
 The derive supports enums only, not structs. With
@@ -40,9 +40,10 @@ Only sqlx 0.7 is supported. The `concord.` code prefix is reserved for
 
 ## Code grammar
 
-Codes are dot-separated, lowercase segments: `domain.subject.reason` (one or
-more non-empty segments, using ASCII letters, digits, and `-`). `unknown` is
-outside this grammar and represents an absent or unclassified code. Code
+Codes have three or more dot-separated segments, each matching
+`[a-z][a-z0-9_]*`. The bare `unknown` is the only exception (see
+`coded-error/src/code.rs` `is_valid_code`) and represents an absent or
+unclassified code. Code
 namespaces must be unique within a crate and across an aggregate checked with
 `check_codes`.
 
@@ -54,7 +55,7 @@ context chain (`{:#}`) as the message. Wire mappings use `Display`.
 Consume the crate by pinning a git revision in `Cargo.toml`:
 
 ```toml
-coded-error = { git = "https://github.com/concord-codes/coded-error", rev = "<revision>" }
+coded-error = { git = "https://github.com/qtpi-bonding/coded-error.git", rev = "<revision>" }
 ```
 
 The check script routes cargo through `cargo-slot`; set `CARGO_SLOT` to

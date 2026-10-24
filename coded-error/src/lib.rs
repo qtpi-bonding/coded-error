@@ -35,7 +35,9 @@ pub use info::ErrorInfo;
 pub use overrides::{GrpcCode, McpCode, Overrides};
 
 #[cfg(feature = "anyhow")]
-pub use carry::*;
+pub use carry::{
+    attach, downcast_ref, facts_anyhow, from_anyhow, into_anyhow, Coded, ResultExt, Uncoded,
+};
 
 /// An error with a stable, namespaced code and a class.
 pub trait CodedError: std::error::Error {
@@ -52,12 +54,16 @@ pub trait CodedError: std::error::Error {
 /// The facts every boundary mapping works from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Facts {
+    /// The stable, namespaced error code.
     pub code: &'static str,
+    /// The error's broad classification.
     pub class: ErrorClass,
+    /// Boundary-specific mapping overrides.
     pub overrides: Overrides,
 }
 
 impl Facts {
+    /// Extract the boundary-mapping facts from a coded error.
     pub fn of<E: CodedError + ?Sized>(e: &E) -> Facts {
         Facts {
             code: e.code(),
