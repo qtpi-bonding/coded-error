@@ -1,0 +1,5 @@
+error: duplicate code "x"
+ --> tests/ui/duplicate_code.rs:6:31
+  |
+6 |  #[error("b")] #[coded(code = "x", class = Logical)] B,
+  |                               ^^^

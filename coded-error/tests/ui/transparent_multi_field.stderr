@@ -1,0 +1,5 @@
+error: transparent needs exactly one field
+ --> tests/ui/transparent_multi_field.rs:7:2
+  |
+7 |  Bad(String, String),
+  |  ^^^

@@ -1,0 +1,42 @@
+error[E0277]: `Kind` doesn't implement `Debug`
+ --> tests/ui/from_non_clone.rs:5:77
+  |
+3 | #[derive(Debug, thiserror::Error, CodedError)]
+  |          ----- in this derive macro expansion
+4 | #[coded(namespace = "test")]
+5 | enum Error { #[error("bad")] #[coded(code = "x", class = from(kind))] Bad { kind: Kind } }
+  |                                                                             ^^^^^^^^^^ the trait `Debug` is not implemented for `Kind`
+  |
+help: consider annotating `Kind` with `#[derive(Debug)]`
+  |
+2 + #[derive(Debug)]
+3 | struct Kind;
+  |
+
+error[E0080]: evaluation panicked: code "test.x" does not match the coded-error grammar
+ --> tests/ui/from_non_clone.rs:3:35
+  |
+3 | #[derive(Debug, thiserror::Error, CodedError)]
+  |                                   ^^^^^^^^^^ evaluation of `_` failed here
+
+error[E0277]: the trait bound `Kind: Clone` is not satisfied
+ --> tests/ui/from_non_clone.rs:3:35
+  |
+3 | #[derive(Debug, thiserror::Error, CodedError)]
+  |                                   ^^^^^^^^^^ the trait `Clone` is not implemented for `Kind`
+  |
+  = note: this error originates in the derive macro `CodedError` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider annotating `Kind` with `#[derive(Clone)]`
+  |
+2 + #[derive(Clone)]
+3 | struct Kind;
+  |
+
+error[E0277]: the trait bound `ErrorClass: From<Kind>` is not satisfied
+ --> tests/ui/from_non_clone.rs:3:35
+  |
+3 | #[derive(Debug, thiserror::Error, CodedError)]
+  |                                   ^^^^^^^^^^ the trait `From<Kind>` is not implemented for `ErrorClass`
+  |
+  = note: required for `Kind` to implement `Into<ErrorClass>`
+  = note: this error originates in the derive macro `CodedError` (in Nightly builds, run with -Z macro-backtrace for more info)

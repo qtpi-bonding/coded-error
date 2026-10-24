@@ -1,0 +1,5 @@
+error: no such field
+ --> tests/ui/from_missing_field.rs:4:63
+  |
+4 | enum Error { #[error("bad")] #[coded(code = "x", class = from(nope))] Bad { value: String } }
+  |                                                               ^^^^

@@ -1,0 +1,5 @@
+error: grpc = Ok is not an error status
+ --> tests/ui/grpc_ok.rs:4:74
+  |
+4 | enum Error { #[error("bad")] #[coded(code = "x", class = Logical, grpc = Ok)] Bad }
+  |                                                                          ^^

@@ -1,0 +1,5 @@
+error: tuple index out of range
+ --> tests/ui/from_tuple_out_of_range.rs:4:68
+  |
+4 | enum Error { #[error("bad")] #[coded(code = "x", class = from(3))] Bad(String) }
+  |                                                                    ^^^

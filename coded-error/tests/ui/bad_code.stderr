@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: code "test.Bad.x" does not match the coded-error grammar
+ --> tests/ui/bad_code.rs:2:35
+  |
+2 | #[derive(Debug, thiserror::Error, CodedError)]
+  |                                   ^^^^^^^^^^ evaluation of `_` failed here

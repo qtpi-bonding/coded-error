@@ -1,0 +1,5 @@
+error: missing #[coded(namespace = "...")]
+ --> tests/ui/missing_namespace.rs:3:6
+  |
+3 | enum Error { #[error("bad")] #[coded(code = "x", class = Logical)] Bad }
+  |      ^^^^^

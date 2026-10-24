@@ -1,0 +1,5 @@
+error: code given twice
+ --> tests/ui/duplicate_code_attr.rs:4:50
+  |
+4 | enum Error { #[error("bad")] #[coded(code = "a", code = "b", class = Logical)] Bad }
+  |                                                  ^^^^

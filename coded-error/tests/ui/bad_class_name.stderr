@@ -1,0 +1,5 @@
+error: class must be Logical, Infrastructure, Transient, Unknown or from(field)
+ --> tests/ui/bad_class_name.rs:4:58
+  |
+4 | enum Error { #[error("bad")] #[coded(code = "x", class = Fatal)] Bad }
+  |                                                          ^^^^^

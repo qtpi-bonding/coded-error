@@ -1,0 +1,5 @@
+error: exactly one class source
+ --> tests/ui/no_class_source.rs:7:5
+  |
+7 |     Bad,
+  |     ^^^
