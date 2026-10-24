@@ -84,6 +84,76 @@ pub fn into_anyhow<E: CodedError + Send + Sync + 'static>(e: E) -> anyhow::Error
     })
 }
 
+/// A failure reported by a remote peer (a gRPC status, say). Display is the
+/// remote message.
+#[derive(Debug)]
+struct Remote(String);
+
+impl fmt::Display for Remote {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl Error for Remote {}
+
+/// Most distinct remote codes kept for the process lifetime. Real code
+/// vocabularies are small; the cap bounds what a hostile peer can make us hold.
+const MAX_REMOTE_CODES: usize = 4096;
+
+/// `Facts.code` is `&'static str`, so a code that arrives at runtime is
+/// interned: leaked once per distinct value and reused after. Invalid codes
+/// (grammar, see `is_valid_code`) and codes past the cap read as `unknown`.
+fn intern_code(code: &str) -> &'static str {
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock};
+    static SEEN: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
+    if code == UNKNOWN_CODE || !crate::is_valid_code(code) {
+        return UNKNOWN_CODE;
+    }
+    let mut seen = SEEN
+        .get_or_init(|| Mutex::new(HashSet::new()))
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    if let Some(s) = seen.get(code) {
+        return s;
+    }
+    if seen.len() >= MAX_REMOTE_CODES {
+        return UNKNOWN_CODE;
+    }
+    let leaked: &'static str = Box::leak(code.to_owned().into_boxed_str());
+    seen.insert(leaked);
+    leaked
+}
+
+/// Raise a failure that happened on the other side of a boundary into anyhow
+/// as a `Coded`, so `from_anyhow`, `facts_anyhow` and every boundary mapping
+/// (cli exit codes, mcp, grpc re-encoding) see the remote `code` and `class`.
+///
+/// Design: the code is interned into the existing `Facts` (see `intern_code`)
+/// rather than adding an owned-code variant, so `Facts` stays `Copy` and no
+/// reader changes. A missing or malformed `code` becomes `unknown` and a
+/// missing `class` becomes `Unknown`. With neither, the result is a plain
+/// (uncoded) error. Display is `message`.
+pub fn from_remote(
+    code: Option<&str>,
+    class: Option<ErrorClass>,
+    message: String,
+) -> anyhow::Error {
+    if code.is_none() && class.is_none() {
+        return anyhow::Error::new(Remote(message));
+    }
+    let facts = Facts {
+        code: code.map_or(UNKNOWN_CODE, intern_code),
+        class: class.unwrap_or(ErrorClass::Unknown),
+        overrides: Overrides::NONE,
+    };
+    anyhow::Error::new(Coded {
+        facts,
+        inner: Inner::Typed(Box::new(Remote(message))),
+    })
+}
+
 /// Attach a typed error's facts to an existing anyhow chain.
 pub fn attach<E: CodedError + ?Sized>(err: anyhow::Error, typed: &E) -> anyhow::Error {
     let facts = Facts::of(typed);

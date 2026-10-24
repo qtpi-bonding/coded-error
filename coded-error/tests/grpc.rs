@@ -82,3 +82,89 @@ fn anyhow_message_is_the_whole_chain() {
         "handling GetAction: loading action: no such action"
     );
 }
+
+#[cfg(feature = "anyhow")]
+mod remote {
+    use super::*;
+    use coded_error::grpc::from_status;
+    use coded_error::{facts_anyhow, from_anyhow, CodedError};
+
+    #[test]
+    fn status_becomes_coded_anyhow() {
+        let s = to_status(&E::NotFound, "server");
+        let err = from_status(&s);
+        assert_eq!(err.to_string(), "no such action");
+        let c = from_anyhow(&err).expect("coded");
+        assert_eq!(c.code(), "test.rpc.not_found");
+        assert_eq!(c.class(), ErrorClass::Logical);
+        // survives context layers and re-encoding on another hop
+        let err = err.context("calling GetAction");
+        assert_eq!(facts_anyhow(&err).code, "test.rpc.not_found");
+        let again = coded_error::grpc::to_status_anyhow(&err, "client");
+        assert_eq!(
+            CodedStatus::from(&again).code.as_deref(),
+            Some("test.rpc.not_found")
+        );
+    }
+
+    #[test]
+    fn uncoded_status_reads_unknown() {
+        let err = from_status(&tonic::Status::internal("plain"));
+        assert_eq!(err.to_string(), "plain");
+        let f = facts_anyhow(&err);
+        assert_eq!(f.code, "unknown");
+        assert_eq!(f.class, ErrorClass::Unknown);
+        assert!(from_anyhow(&err).is_none());
+    }
+
+    #[test]
+    fn server_unknown_code_and_malformed_code() {
+        let s = coded_error::grpc::to_status_anyhow(&anyhow::anyhow!("boom"), "m");
+        assert_eq!(facts_anyhow(&from_status(&s)).code, "unknown");
+        let mut bad = tonic::Status::internal("x");
+        bad.metadata_mut()
+            .insert("x-error-code", "Not A Code".parse().unwrap());
+        bad.metadata_mut()
+            .insert("x-error-class", "transient".parse().unwrap());
+        let f = facts_anyhow(&from_status(&bad));
+        assert_eq!(f.code, "unknown");
+        assert_eq!(f.class, ErrorClass::Transient);
+    }
+
+    #[cfg(feature = "cli")]
+    #[test]
+    fn exit_code_matches_original() {
+        use coded_error::cli::exit_code_anyhow;
+        use coded_error::into_anyhow;
+        for e in [E::Missing, E::Down, E::Internal, E::Unknown] {
+            let want = exit_code_anyhow(&into_anyhow(match e {
+                E::Missing => E::Missing,
+                E::Down => E::Down,
+                E::Internal => E::Internal,
+                _ => E::Unknown,
+            }));
+            let got = exit_code_anyhow(&from_status(&to_status(&e, "s")));
+            assert_eq!(got, want);
+        }
+        assert_eq!(
+            exit_code_anyhow(&from_status(&to_status(&E::Down, "s"))),
+            75
+        );
+    }
+
+    #[cfg(feature = "mcp")]
+    #[test]
+    fn mcp_data_matches_original() {
+        use coded_error::into_anyhow;
+        use coded_error::mcp::to_mcp_error_anyhow;
+        let orig = to_mcp_error_anyhow(&into_anyhow(E::Missing), "s");
+        let remote = to_mcp_error_anyhow(&from_status(&to_status(&E::Missing, "srv")), "s");
+        assert_eq!(remote.code, orig.code);
+        assert_eq!(remote.message, orig.message);
+        assert_eq!(remote.data, orig.data);
+        assert_eq!(
+            remote.data.as_ref().unwrap()["code"],
+            "test.rpc.missing_name"
+        );
+    }
+}

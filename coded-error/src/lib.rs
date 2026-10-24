@@ -36,7 +36,8 @@ pub use overrides::{GrpcCode, McpCode, Overrides};
 
 #[cfg(feature = "anyhow")]
 pub use carry::{
-    attach, downcast_ref, facts_anyhow, from_anyhow, into_anyhow, Coded, ResultExt, Uncoded,
+    attach, downcast_ref, facts_anyhow, from_anyhow, from_remote, into_anyhow, Coded, ResultExt,
+    Uncoded,
 };
 
 /// An error with a stable, namespaced code and a class.

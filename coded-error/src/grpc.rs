@@ -76,3 +76,18 @@ impl From<&Status> for CodedStatus {
         }
     }
 }
+
+/// Client side: turn a received status into an anyhow error the readers
+/// recognise (`from_anyhow`, `exit_code_anyhow`, `to_mcp_error_anyhow`,
+/// `to_status_anyhow`), carrying the server's code and class. A status
+/// without coded metadata reads as `unknown`. Display is the status message.
+#[cfg(feature = "anyhow")]
+pub fn from_status(status: &Status) -> anyhow::Error {
+    from_coded_status(&CodedStatus::from(status), status.message())
+}
+
+/// As `from_status`, for callers that already extracted the `CodedStatus`.
+#[cfg(feature = "anyhow")]
+pub fn from_coded_status(coded: &CodedStatus, message: &str) -> anyhow::Error {
+    crate::from_remote(coded.code.as_deref(), coded.class, message.to_owned())
+}
