@@ -1,33 +1,20 @@
-error[E0599]: the method `as_dyn_error` exists for reference `&String`, but its trait bounds were not satisfied
- --> tests/ui/transparent_inner_not_coded.rs:4:22
-  |
-4 | enum Error { #[error(transparent)] #[coded(transparent)] Bad(String) }
-  |                      ^^^^^^^^^^^ method cannot be called on `&String` due to unsatisfied trait bounds
-  |
- ::: $RUST/alloc/src/string.rs
-  |
-  | pub struct String {
-  | ----------------- doesn't satisfy `String: std::error::Error` or `String: thiserror::__private21::AsDynError<'_>`
-  |
-  = note: the following trait bounds were not satisfied:
-          `String: std::error::Error`
-          which is required by `String: thiserror::__private21::AsDynError<'_>`
-          `&String: std::error::Error`
-          which is required by `&String: thiserror::__private21::AsDynError<'_>`
-          `str: Sized`
-          which is required by `str: thiserror::__private21::AsDynError<'_>`
-          `str: std::error::Error`
-          which is required by `str: thiserror::__private21::AsDynError<'_>`
-
-error[E0277]: the trait bound `String: CodedError` is not satisfied
+error[E0277]: the trait bound `std::fmt::Error: CodedError` is not satisfied
  --> tests/ui/transparent_inner_not_coded.rs:2:35
   |
 2 | #[derive(Debug, thiserror::Error, CodedError)]
-  |                                   ^^^^^^^^^^ the trait `CodedError` is not implemented for `String`
+  |                                   ^^^^^^^^^^ the trait `CodedError` is not implemented for `std::fmt::Error`
   |
-help: the trait `CodedError` is implemented for `Error`
+help: the following other types implement trait `CodedError`
  --> tests/ui/transparent_inner_not_coded.rs:2:35
   |
 2 | #[derive(Debug, thiserror::Error, CodedError)]
-  |                                   ^^^^^^^^^^
+  |                                   ^^^^^^^^^^ `Error`
+  |
+ ::: src/carry.rs
+  |
+  | impl CodedError for Coded {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ `Coded`
+...
+  | impl CodedError for Uncoded {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Uncoded`
   = note: this error originates in the derive macro `CodedError` (in Nightly builds, run with -Z macro-backtrace for more info)

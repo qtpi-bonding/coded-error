@@ -1,9 +1,3 @@
-error[E0080]: evaluation panicked: code "test.x" does not match the coded-error grammar
- --> tests/ui/http_out_of_range.rs:2:35
-  |
-2 | #[derive(Debug, thiserror::Error, CodedError)]
-  |                                   ^^^^^^^^^^ evaluation of `_` failed here
-
 error[E0080]: evaluation panicked: http status must be 100..=599
  --> tests/ui/http_out_of_range.rs:2:35
   |

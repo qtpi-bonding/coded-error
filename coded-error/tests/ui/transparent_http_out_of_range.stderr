@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: http status must be 100..=599
+  --> tests/ui/transparent_http_out_of_range.rs:11:35
+   |
+11 | #[derive(Debug, thiserror::Error, CodedError)]
+   |                                   ^^^^^^^^^^ evaluation of `_` failed here

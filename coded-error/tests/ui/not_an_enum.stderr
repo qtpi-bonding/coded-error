@@ -1,5 +1,5 @@
 error: CodedError derive supports enums only
- --> tests/ui/not_an_enum.rs:3:1
+ --> tests/ui/not_an_enum.rs:4:8
   |
-3 | #[coded(namespace = "test")]
-  | ^
+4 | struct Error;
+  |        ^^^^^

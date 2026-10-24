@@ -1,9 +1,3 @@
-error[E0080]: evaluation panicked: code "test.x" does not match the coded-error grammar
- --> tests/ui/unknown_grpc.rs:2:35
-  |
-2 | #[derive(Debug, thiserror::Error, CodedError)]
-  |                                   ^^^^^^^^^^ evaluation of `_` failed here
-
 error[E0599]: no variant, associated function, or constant named `Nope` found for enum `GrpcCode` in the current scope
  --> tests/ui/unknown_grpc.rs:4:74
   |

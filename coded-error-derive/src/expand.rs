@@ -27,7 +27,7 @@ struct VariantSpec {
 
 pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     let Data::Enum(data) = &input.data else {
-        return Err(syn::Error::new(input.span(), "CodedError derive supports enums only"));
+        return Err(syn::Error::new(input.ident.span(), "CodedError derive supports enums only"));
     };
     let namespace = parse_namespace(input)?;
     let mut specs = Vec::new();
@@ -57,6 +57,9 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     for s in &specs {
         let v = &s.ident;
         let own = overrides_tokens(s);
+        if let Some(h) = &s.http {
+            asserts.push(quote! { const _: () = ::core::assert!(#h >= 100 && #h <= 599, "http status must be 100..=599"); });
+        }
         match &s.class {
             ClassSource::Transparent => {
                 let inner = format_ident!("__inner");
@@ -80,9 +83,6 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
                 let full_code = full(code);
                 let msg = format!("code {:?} does not match the coded-error grammar", full_code.value());
                 asserts.push(quote! { const _: () = ::core::assert!(::coded_error::is_valid_code(#full_code), #msg); });
-                if let Some(h) = &s.http {
-                    asserts.push(quote! { const _: () = ::core::assert!(#h >= 100 && #h <= 599, "http status must be 100..=599"); });
-                }
                 all_codes.push(full_code.clone());
                 let wild = wildcard_pattern(v, &s.fields);
                 code_arms.push(quote! { #wild => #full_code });

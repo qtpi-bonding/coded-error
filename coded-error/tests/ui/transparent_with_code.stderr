@@ -1,26 +1,5 @@
 error: transparent variants take the inner code
  --> tests/ui/transparent_with_code.rs:4:64
   |
-4 | enum Error { #[error(transparent)] #[coded(transparent, code = "x")] Bad(String) }
+4 | enum Error { #[error(transparent)] #[coded(transparent, code = "x")] Bad(std::fmt::Error) }
   |                                                                ^^^
-
-error[E0599]: the method `as_dyn_error` exists for reference `&String`, but its trait bounds were not satisfied
- --> tests/ui/transparent_with_code.rs:4:22
-  |
-4 | enum Error { #[error(transparent)] #[coded(transparent, code = "x")] Bad(String) }
-  |                      ^^^^^^^^^^^ method cannot be called on `&String` due to unsatisfied trait bounds
-  |
- ::: $RUST/alloc/src/string.rs
-  |
-  | pub struct String {
-  | ----------------- doesn't satisfy `String: std::error::Error` or `String: thiserror::__private21::AsDynError<'_>`
-  |
-  = note: the following trait bounds were not satisfied:
-          `String: std::error::Error`
-          which is required by `String: thiserror::__private21::AsDynError<'_>`
-          `&String: std::error::Error`
-          which is required by `&String: thiserror::__private21::AsDynError<'_>`
-          `str: Sized`
-          which is required by `str: thiserror::__private21::AsDynError<'_>`
-          `str: std::error::Error`
-          which is required by `str: thiserror::__private21::AsDynError<'_>`
