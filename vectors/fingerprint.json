@@ -1,0 +1,8 @@
+[
+  {"code": "grorg.action.not_found", "class": "logical", "source": "grorg_server::GetAction", "fingerprint": "4ad3d16c4463edee"},
+  {"code": "grorg.action.not_found", "class": "logical", "source": "grorg_server", "fingerprint": "f163b0ebfd801abd"},
+  {"code": "unknown", "class": "unknown", "source": "archegraph_ops::BuildProceed", "fingerprint": "eab0edb7ddf9d2fa"},
+  {"code": "catuskoti.db.database", "class": "transient", "source": "catuskoti_ops::dispatch", "fingerprint": "a5dd2f493d62e192"},
+  {"code": "concord.process.panic", "class": "unknown", "source": "src/main.rs", "fingerprint": "843f88f0d4572c12"},
+  {"code": "multimatrix.admission.signature_invalid", "class": "infrastructure", "source": "", "fingerprint": "4c4227b44c88d9a6"}
+]
