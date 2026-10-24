@@ -17,14 +17,20 @@ fn default_code(class: ErrorClass) -> GrpcCode {
 }
 
 fn status_from(facts: Facts, message: String, source: &str) -> Status {
-    let grpc = facts.overrides.grpc.unwrap_or_else(|| default_code(facts.class));
+    let grpc = facts
+        .overrides
+        .grpc
+        .unwrap_or_else(|| default_code(facts.class));
     let mut status = Status::new(Code::from(grpc as i32), message);
     let md = status.metadata_mut();
     // Codes and classes are ASCII by construction; fingerprint is hex.
     for (k, v) in [
         (CODE_KEY, facts.code.to_owned()),
         (CLASS_KEY, facts.class.as_str().to_owned()),
-        (FINGERPRINT_KEY, fingerprint(facts.code, facts.class, source)),
+        (
+            FINGERPRINT_KEY,
+            fingerprint(facts.code, facts.class, source),
+        ),
     ] {
         if let Ok(val) = MetadataValue::try_from(v.as_str()) {
             md.insert(k, val);

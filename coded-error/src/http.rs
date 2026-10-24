@@ -10,7 +10,10 @@ fn default_status(class: ErrorClass) -> u16 {
 }
 
 fn from_facts(facts: Facts, source: &str) -> (u16, ErrorInfo) {
-    let status = facts.overrides.http.unwrap_or_else(|| default_status(facts.class));
+    let status = facts
+        .overrides
+        .http
+        .unwrap_or_else(|| default_status(facts.class));
     (status, ErrorInfo::from_facts(&facts, source))
 }
 

@@ -1,10 +1,16 @@
 use coded_error::{CodedError, ErrorClass, GrpcCode, McpCode, Overrides};
 
 #[derive(Debug, Clone, Copy)]
-pub enum FailureKind { Logical, Transient }
+pub enum FailureKind {
+    Logical,
+    Transient,
+}
 impl From<FailureKind> for ErrorClass {
     fn from(k: FailureKind) -> ErrorClass {
-        match k { FailureKind::Logical => ErrorClass::Logical, FailureKind::Transient => ErrorClass::Transient }
+        match k {
+            FailureKind::Logical => ErrorClass::Logical,
+            FailureKind::Transient => ErrorClass::Transient,
+        }
     }
 }
 
@@ -17,7 +23,10 @@ pub enum StorageError {
 }
 
 fn classify(e: &ActionError) -> ErrorClass {
-    match e { ActionError::Backend(n) if *n > 0 => ErrorClass::Transient, _ => ErrorClass::Unknown }
+    match e {
+        ActionError::Backend(n) if *n > 0 => ErrorClass::Transient,
+        _ => ErrorClass::Unknown,
+    }
 }
 
 #[derive(Debug, thiserror::Error, CodedError)]
@@ -46,18 +55,33 @@ pub enum ActionError {
 
 #[test]
 fn codes_and_classes() {
-    let nf = ActionError::NotFound { action_id: "a".into() };
+    let nf = ActionError::NotFound {
+        action_id: "a".into(),
+    };
     assert_eq!(nf.code(), "test.action.not_found");
     assert_eq!(nf.class(), ErrorClass::Logical);
-    assert_eq!(nf.overrides(), Overrides { grpc: Some(GrpcCode::NotFound), http: Some(404), mcp: Some(McpCode::ResourceNotFound) });
+    assert_eq!(
+        nf.overrides(),
+        Overrides {
+            grpc: Some(GrpcCode::NotFound),
+            http: Some(404),
+            mcp: Some(McpCode::ResourceNotFound)
+        }
+    );
 
-    let db = ActionError::Database { kind: FailureKind::Transient, message: "x".into() };
+    let db = ActionError::Database {
+        kind: FailureKind::Transient,
+        message: "x".into(),
+    };
     assert_eq!(db.code(), "test.action.database");
     assert_eq!(db.class(), ErrorClass::Transient);
 
     assert_eq!(ActionError::Backend(1).class(), ErrorClass::Transient);
     assert_eq!(ActionError::Backend(0).class(), ErrorClass::Unknown);
-    assert_eq!(ActionError::TupleFrom(FailureKind::Logical).class(), ErrorClass::Logical);
+    assert_eq!(
+        ActionError::TupleFrom(FailureKind::Logical).class(),
+        ErrorClass::Logical
+    );
 }
 
 #[test]
@@ -73,6 +97,14 @@ fn transparent_takes_inner_code_and_class_and_outer_override_wins() {
 
 #[test]
 fn all_codes_lists_own_codes_only() {
-    assert_eq!(ActionError::ALL_CODES, &["test.action.not_found", "test.action.database", "test.action.backend", "test.action.tuple_from"]);
+    assert_eq!(
+        ActionError::ALL_CODES,
+        &[
+            "test.action.not_found",
+            "test.action.database",
+            "test.action.backend",
+            "test.action.tuple_from"
+        ]
+    );
     coded_error::check_codes("test.action.", &[ActionError::ALL_CODES]).unwrap();
 }

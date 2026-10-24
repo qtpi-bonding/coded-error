@@ -22,10 +22,7 @@ impl From<FailureKind> for ErrorClass {
 pub enum CompatError {
     #[error("database: {message}")]
     #[coded(code = "database", class = from(kind))]
-    Database {
-        kind: FailureKind,
-        message: String,
-    },
+    Database { kind: FailureKind, message: String },
     #[error("not found")]
     #[coded(code = "not_found", class = Logical, http = 404)]
     NotFound,

@@ -16,16 +16,7 @@ fn grammar_accepts_three_or_more_segments() {
 #[test]
 fn grammar_rejects_bad_codes() {
     for bad in [
-        "",
-        "unknown",
-        "a.b",
-        "A.b.c",
-        "a..b.c",
-        "a.b.c.",
-        ".a.b.c",
-        "1a.b.c",
-        "a.b-c.d",
-        "a.b.C",
+        "", "unknown", "a.b", "A.b.c", "a..b.c", "a.b.c.", ".a.b.c", "1a.b.c", "a.b-c.d", "a.b.C",
         "a.b._c",
     ] {
         assert!(!is_valid_code(bad), "{bad}");

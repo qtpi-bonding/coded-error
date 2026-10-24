@@ -1,5 +1,8 @@
 #![cfg(feature = "anyhow")]
-use coded_error::{attach, downcast_ref, facts_anyhow, from_anyhow, into_anyhow, CodedError, ErrorClass, ResultExt, Uncoded};
+use coded_error::{
+    attach, downcast_ref, facts_anyhow, from_anyhow, into_anyhow, CodedError, ErrorClass,
+    ResultExt, Uncoded,
+};
 
 #[derive(Debug, thiserror::Error, coded_error::CodedError)]
 #[coded(namespace = "test.op")]
@@ -9,7 +12,9 @@ enum OpError {
     NotFound(String),
 }
 
-fn typed() -> Result<(), OpError> { Err(OpError::NotFound("a1".into())) }
+fn typed() -> Result<(), OpError> {
+    Err(OpError::NotFound("a1".into()))
+}
 
 #[test]
 fn into_anyhow_keeps_message_and_facts() {
@@ -26,7 +31,10 @@ fn found_through_multiple_context_layers() {
         .context("loading action")
         .context("handling GetAction");
     assert_eq!(from_anyhow(&err).unwrap().code(), "test.op.not_found");
-    assert_eq!(format!("{err:#}"), "handling GetAction: loading action: thing a1 not found");
+    assert_eq!(
+        format!("{err:#}"),
+        "handling GetAction: loading action: thing a1 not found"
+    );
 }
 
 #[test]

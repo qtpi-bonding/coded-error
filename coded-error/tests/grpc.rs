@@ -41,7 +41,14 @@ fn metadata_round_trips() {
     assert_eq!(c.class, Some(ErrorClass::Logical));
     assert_eq!(
         c.fingerprint.as_deref(),
-        Some(fingerprint("test.rpc.not_found", ErrorClass::Logical, "grorg_server::GetAction").as_str())
+        Some(
+            fingerprint(
+                "test.rpc.not_found",
+                ErrorClass::Logical,
+                "grorg_server::GetAction"
+            )
+            .as_str()
+        )
     );
 }
 
@@ -67,6 +74,11 @@ fn anyhow_form_and_unknown_fallback() {
 fn anyhow_message_is_the_whole_chain() {
     use coded_error::grpc::to_status_anyhow;
     use coded_error::into_anyhow;
-    let err = into_anyhow(E::NotFound).context("loading action").context("handling GetAction");
-    assert_eq!(to_status_anyhow(&err, "m").message(), "handling GetAction: loading action: no such action");
+    let err = into_anyhow(E::NotFound)
+        .context("loading action")
+        .context("handling GetAction");
+    assert_eq!(
+        to_status_anyhow(&err, "m").message(),
+        "handling GetAction: loading action: no such action"
+    );
 }

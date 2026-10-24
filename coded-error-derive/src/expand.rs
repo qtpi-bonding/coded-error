@@ -1,7 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashSet;
-use syn::{spanned::Spanned, Data, DeriveInput, Expr, ExprLit, Fields, Ident, Lit, LitInt, LitStr, Path};
+use syn::{
+    spanned::Spanned, Data, DeriveInput, Expr, ExprLit, Fields, Ident, Lit, LitInt, LitStr, Path,
+};
 
 enum ClassSource {
     Fixed(Ident),
@@ -27,7 +29,10 @@ struct VariantSpec {
 
 pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     let Data::Enum(data) = &input.data else {
-        return Err(syn::Error::new(input.ident.span(), "CodedError derive supports enums only"));
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "CodedError derive supports enums only",
+        ));
     };
     let namespace = parse_namespace(input)?;
     let mut specs = Vec::new();
@@ -36,18 +41,29 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         let spec = parse_variant(v)?;
         if let Some(code) = &spec.code {
             if !seen.insert(code.value()) {
-                return Err(syn::Error::new(code.span(), format!("duplicate code {:?}", code.value())));
+                return Err(syn::Error::new(
+                    code.span(),
+                    format!("duplicate code {:?}", code.value()),
+                ));
             }
         }
         specs.push(spec);
     }
     if specs.is_empty() {
-        return Err(syn::Error::new(input.ident.span(), "CodedError needs at least one variant"));
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "CodedError needs at least one variant",
+        ));
     }
 
     let name = &input.ident;
     let (impl_g, ty_g, where_g) = input.generics.split_for_impl();
-    let full = |code: &LitStr| LitStr::new(&format!("{}.{}", namespace.value(), code.value()), code.span());
+    let full = |code: &LitStr| {
+        LitStr::new(
+            &format!("{}.{}", namespace.value(), code.value()),
+            code.span(),
+        )
+    };
     let mut code_arms = Vec::new();
     let mut class_arms = Vec::new();
     let mut override_arms = Vec::new();
@@ -81,7 +97,10 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
             other => {
                 let code = s.code.as_ref().expect("checked in parse_variant");
                 let full_code = full(code);
-                let msg = format!("code {:?} does not match the coded-error grammar", full_code.value());
+                let msg = format!(
+                    "code {:?} does not match the coded-error grammar",
+                    full_code.value()
+                );
                 asserts.push(quote! { const _: () = ::core::assert!(::coded_error::is_valid_code(#full_code), #msg); });
                 all_codes.push(full_code.clone());
                 let wild = wildcard_pattern(v, &s.fields);
@@ -131,16 +150,25 @@ fn parse_namespace(input: &DeriveInput) -> syn::Result<LitStr> {
 }
 
 fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
-    let attrs: Vec<_> = v.attrs.iter().filter(|a| a.path().is_ident("coded")).collect();
+    let attrs: Vec<_> = v
+        .attrs
+        .iter()
+        .filter(|a| a.path().is_ident("coded"))
+        .collect();
     if attrs.is_empty() {
-        return Err(syn::Error::new(v.ident.span(), "every variant needs #[coded(...)]"));
+        return Err(syn::Error::new(
+            v.ident.span(),
+            "every variant needs #[coded(...)]",
+        ));
     }
     let (mut code, mut grpc, mut http, mut mcp) = (None, None, None, None);
     let mut classes = Vec::new();
     for attr in attrs {
         attr.parse_nested_meta(|m| {
             if m.path.is_ident("code") {
-                if code.is_some() { return Err(m.error("code given twice")); }
+                if code.is_some() {
+                    return Err(m.error("code given twice"));
+                }
                 code = Some(m.value()?.parse::<LitStr>()?);
             } else if m.path.is_ident("transparent") {
                 classes.push(ClassSource::Transparent);
@@ -151,7 +179,12 @@ fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
                 classes.push(parse_class_expr(&expr)?);
             } else if m.path.is_ident("grpc") {
                 let g = m.value()?.parse::<Ident>()?;
-                if g == "Ok" { return Err(syn::Error::new(g.span(), "grpc = Ok is not an error status")); }
+                if g == "Ok" {
+                    return Err(syn::Error::new(
+                        g.span(),
+                        "grpc = Ok is not an error status",
+                    ));
+                }
                 grpc = Some(g);
             } else if m.path.is_ident("http") {
                 http = Some(m.value()?.parse::<LitInt>()?);
@@ -168,14 +201,32 @@ fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
     }
     let class = classes.pop().unwrap();
     match (&class, &code) {
-        (ClassSource::Transparent, Some(c)) => return Err(syn::Error::new(c.span(), "transparent variants take the inner code")),
+        (ClassSource::Transparent, Some(c)) => {
+            return Err(syn::Error::new(
+                c.span(),
+                "transparent variants take the inner code",
+            ))
+        }
         (ClassSource::Transparent, None) => {
-            if v.fields.len() != 1 { return Err(syn::Error::new(v.ident.span(), "transparent needs exactly one field")); }
+            if v.fields.len() != 1 {
+                return Err(syn::Error::new(
+                    v.ident.span(),
+                    "transparent needs exactly one field",
+                ));
+            }
         }
         (_, None) => return Err(syn::Error::new(v.ident.span(), "missing code = \"...\"")),
         _ => {}
     }
-    Ok(VariantSpec { ident: v.ident.clone(), fields: v.fields.clone(), code, class, grpc, http, mcp })
+    Ok(VariantSpec {
+        ident: v.ident.clone(),
+        fields: v.fields.clone(),
+        code,
+        class,
+        grpc,
+        http,
+        mcp,
+    })
 }
 
 fn parse_class_expr(expr: &Expr) -> syn::Result<ClassSource> {
@@ -183,18 +234,36 @@ fn parse_class_expr(expr: &Expr) -> syn::Result<ClassSource> {
         Expr::Path(p) if p.path.get_ident().is_some() => {
             let id = p.path.get_ident().unwrap().clone();
             match id.to_string().as_str() {
-                "Logical" | "Infrastructure" | "Transient" | "Unknown" => Ok(ClassSource::Fixed(id)),
-                _ => Err(syn::Error::new(id.span(), "class must be Logical, Infrastructure, Transient, Unknown or from(field)")),
+                "Logical" | "Infrastructure" | "Transient" | "Unknown" => {
+                    Ok(ClassSource::Fixed(id))
+                }
+                _ => Err(syn::Error::new(
+                    id.span(),
+                    "class must be Logical, Infrastructure, Transient, Unknown or from(field)",
+                )),
             }
         }
-        Expr::Call(call) if matches!(&*call.func, Expr::Path(p) if p.path.is_ident("from")) && call.args.len() == 1 => {
+        Expr::Call(call)
+            if matches!(&*call.func, Expr::Path(p) if p.path.is_ident("from"))
+                && call.args.len() == 1 =>
+        {
             match &call.args[0] {
-                Expr::Path(p) if p.path.get_ident().is_some() => Ok(ClassSource::FromField(FieldRef::Named(p.path.get_ident().unwrap().clone()))),
-                Expr::Lit(ExprLit { lit: Lit::Int(i), .. }) => Ok(ClassSource::FromField(FieldRef::Index(i.base10_parse()?))),
-                other => Err(syn::Error::new(other.span(), "from(...) takes a field name or tuple index")),
+                Expr::Path(p) if p.path.get_ident().is_some() => Ok(ClassSource::FromField(
+                    FieldRef::Named(p.path.get_ident().unwrap().clone()),
+                )),
+                Expr::Lit(ExprLit {
+                    lit: Lit::Int(i), ..
+                }) => Ok(ClassSource::FromField(FieldRef::Index(i.base10_parse()?))),
+                other => Err(syn::Error::new(
+                    other.span(),
+                    "from(...) takes a field name or tuple index",
+                )),
             }
         }
-        other => Err(syn::Error::new(other.span(), "class must be Logical, Infrastructure, Transient, Unknown or from(field)")),
+        other => Err(syn::Error::new(
+            other.span(),
+            "class must be Logical, Infrastructure, Transient, Unknown or from(field)",
+        )),
     }
 }
 
@@ -204,9 +273,18 @@ fn overrides_tokens(s: &VariantSpec) -> TokenStream {
 }
 
 fn override_parts(s: &VariantSpec) -> (TokenStream, TokenStream, TokenStream) {
-    let grpc = match &s.grpc { Some(g) => quote! { ::core::option::Option::Some(::coded_error::GrpcCode::#g) }, None => quote! { ::core::option::Option::None } };
-    let http = match &s.http { Some(h) => quote! { ::core::option::Option::Some(#h) }, None => quote! { ::core::option::Option::None } };
-    let mcp = match &s.mcp { Some(m) => quote! { ::core::option::Option::Some(::coded_error::McpCode::#m) }, None => quote! { ::core::option::Option::None } };
+    let grpc = match &s.grpc {
+        Some(g) => quote! { ::core::option::Option::Some(::coded_error::GrpcCode::#g) },
+        None => quote! { ::core::option::Option::None },
+    };
+    let http = match &s.http {
+        Some(h) => quote! { ::core::option::Option::Some(#h) },
+        None => quote! { ::core::option::Option::None },
+    };
+    let mcp = match &s.mcp {
+        Some(m) => quote! { ::core::option::Option::Some(::coded_error::McpCode::#m) },
+        None => quote! { ::core::option::Option::None },
+    };
     (grpc, http, mcp)
 }
 
@@ -225,21 +303,42 @@ fn single_field_pattern(v: &Ident, fields: &Fields, bind: &Ident) -> syn::Result
             Ok(quote! { Self::#v { #f: #bind } })
         }
         Fields::Unnamed(_) => Ok(quote! { Self::#v(#bind) }),
-        Fields::Unit => Err(syn::Error::new(v.span(), "transparent needs exactly one field")),
+        Fields::Unit => Err(syn::Error::new(
+            v.span(),
+            "transparent needs exactly one field",
+        )),
     }
 }
 
-fn field_pattern(v: &Ident, fields: &Fields, f: &FieldRef, bind: &Ident) -> syn::Result<TokenStream> {
+fn field_pattern(
+    v: &Ident,
+    fields: &Fields,
+    f: &FieldRef,
+    bind: &Ident,
+) -> syn::Result<TokenStream> {
     match (fields, f) {
         (Fields::Named(n), FieldRef::Named(name)) => {
-            if !n.named.iter().any(|x| x.ident.as_ref() == Some(name)) { return Err(syn::Error::new(name.span(), "no such field")); }
+            if !n.named.iter().any(|x| x.ident.as_ref() == Some(name)) {
+                return Err(syn::Error::new(name.span(), "no such field"));
+            }
             Ok(quote! { Self::#v { #name: #bind, .. } })
         }
         (Fields::Unnamed(u), FieldRef::Index(i)) => {
-            if *i >= u.unnamed.len() { return Err(syn::Error::new(v.span(), "tuple index out of range")); }
-            let pats = (0..u.unnamed.len()).map(|k| if k == *i { quote! { #bind } } else { quote! { _ } });
+            if *i >= u.unnamed.len() {
+                return Err(syn::Error::new(v.span(), "tuple index out of range"));
+            }
+            let pats = (0..u.unnamed.len()).map(|k| {
+                if k == *i {
+                    quote! { #bind }
+                } else {
+                    quote! { _ }
+                }
+            });
             Ok(quote! { Self::#v(#(#pats),*) })
         }
-        _ => Err(syn::Error::new(v.span(), "from(...) must name a field of this variant")),
+        _ => Err(syn::Error::new(
+            v.span(),
+            "from(...) must name a field of this variant",
+        )),
     }
 }
