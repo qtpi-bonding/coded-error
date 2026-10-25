@@ -34,7 +34,7 @@ impl Coded {
     /// The wrapped typed error's own Display. `None` for an attached anyhow
     /// chain or a relayed remote message, whose text this process did not
     /// write and may carry anything.
-    #[cfg(any(feature = "grpc", feature = "http", feature = "mcp"))]
+    #[cfg(any(feature = "grpc", feature = "http", feature = "mcp", feature = "acp"))]
     fn own_message(&self) -> Option<String> {
         match &self.inner {
             Inner::Typed(b) if !b.is::<Remote>() => Some(b.to_string()),
@@ -243,7 +243,7 @@ pub fn facts_anyhow(err: &anyhow::Error) -> Facts {
 /// error's own Display, without the context added around it; `fixed` for
 /// everything else (other classes, uncoded errors, chains coded with
 /// `attach`, messages relayed from a remote).
-#[cfg(any(feature = "grpc", feature = "http", feature = "mcp"))]
+#[cfg(any(feature = "grpc", feature = "http", feature = "mcp", feature = "acp"))]
 pub(crate) fn redacted_message(err: &anyhow::Error, fixed: &str) -> String {
     from_anyhow(err)
         .filter(|coded| coded.facts.class == ErrorClass::Logical)

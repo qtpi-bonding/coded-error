@@ -9,7 +9,7 @@ $SLOT cargo fmt --all -- --check
 $SLOT cargo clippy --workspace --all-targets --all-features -- -D warnings
 $SLOT cargo test --workspace --all-features
 $SLOT cargo check -p coded-error --no-default-features
-for f in serde grpc http mcp cli proto sqlx; do
+for f in serde grpc http mcp acp cli proto sqlx; do
     $SLOT cargo check -p coded-error --no-default-features --features "$f"
 done
 

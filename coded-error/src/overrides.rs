@@ -38,6 +38,8 @@ pub struct Overrides {
     pub grpc: Option<GrpcCode>,
     pub http: Option<u16>,
     pub mcp: Option<McpCode>,
+    /// A JSON-RPC error code for ACP; see [`is_valid_acp_code`].
+    pub acp: Option<i32>,
 }
 
 impl Overrides {
@@ -45,6 +47,7 @@ impl Overrides {
         grpc: None,
         http: None,
         mcp: None,
+        acp: None,
     };
 
     /// `self` wins where set; `inner` fills the rest. Used for transparent
@@ -63,6 +66,18 @@ impl Overrides {
                 Some(c) => Some(c),
                 None => inner.mcp,
             },
+            acp: match self.acp {
+                Some(c) => Some(c),
+                None => inner.acp,
+            },
         }
     }
+}
+
+/// Whether `code` may be an ACP error override: a standard JSON-RPC error
+/// (-32700, -32600..=-32603) or the implementation-defined range
+/// -32099..=-32000, where ACP itself defines -32000 (auth required) and
+/// -32002 (resource not found).
+pub const fn is_valid_acp_code(code: i32) -> bool {
+    matches!(code, -32700 | -32603..=-32600 | -32099..=-32000)
 }

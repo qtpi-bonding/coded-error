@@ -25,6 +25,7 @@ struct VariantSpec {
     grpc: Option<Ident>,
     http: Option<LitInt>,
     mcp: Option<Ident>,
+    acp: Option<Expr>,
 }
 
 pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
@@ -76,11 +77,14 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         if let Some(h) = &s.http {
             asserts.push(quote! { const _: () = ::core::assert!(#h >= 100 && #h <= 599, "http status must be 100..=599"); });
         }
+        if let Some(a) = &s.acp {
+            asserts.push(quote! { const _: () = ::core::assert!(::coded_error::is_valid_acp_code(#a), "acp code must be a standard JSON-RPC error code or in -32099..=-32000"); });
+        }
         match &s.class {
             ClassSource::Transparent => {
                 let inner = format_ident!("__inner");
                 let pat = single_field_pattern(v, &s.fields, &inner)?;
-                let (grpc, http, mcp) = override_parts(s);
+                let (grpc, http, mcp, acp) = override_parts(s);
                 code_arms.push(quote! { #pat => ::coded_error::CodedError::code(#inner) });
                 class_arms.push(quote! { #pat => ::coded_error::CodedError::class(#inner) });
                 override_arms.push(quote! {
@@ -90,6 +94,7 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
                             grpc: #grpc.or(__inner_overrides.grpc),
                             http: #http.or(__inner_overrides.http),
                             mcp: #mcp.or(__inner_overrides.mcp),
+                            acp: #acp.or(__inner_overrides.acp),
                         }
                     }
                 });
@@ -161,7 +166,7 @@ fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
             "every variant needs #[coded(...)]",
         ));
     }
-    let (mut code, mut grpc, mut http, mut mcp) = (None, None, None, None);
+    let (mut code, mut grpc, mut http, mut mcp, mut acp) = (None, None, None, None, None);
     let mut classes = Vec::new();
     for attr in attrs {
         attr.parse_nested_meta(|m| {
@@ -190,6 +195,8 @@ fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
                 http = Some(m.value()?.parse::<LitInt>()?);
             } else if m.path.is_ident("mcp") {
                 mcp = Some(m.value()?.parse::<Ident>()?);
+            } else if m.path.is_ident("acp") {
+                acp = Some(m.value()?.parse::<Expr>()?);
             } else {
                 return Err(m.error("unknown coded attribute"));
             }
@@ -226,6 +233,7 @@ fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
         grpc,
         http,
         mcp,
+        acp,
     })
 }
 
@@ -268,11 +276,11 @@ fn parse_class_expr(expr: &Expr) -> syn::Result<ClassSource> {
 }
 
 fn overrides_tokens(s: &VariantSpec) -> TokenStream {
-    let (grpc, http, mcp) = override_parts(s);
-    quote! { ::coded_error::Overrides { grpc: #grpc, http: #http, mcp: #mcp } }
+    let (grpc, http, mcp, acp) = override_parts(s);
+    quote! { ::coded_error::Overrides { grpc: #grpc, http: #http, mcp: #mcp, acp: #acp } }
 }
 
-fn override_parts(s: &VariantSpec) -> (TokenStream, TokenStream, TokenStream) {
+fn override_parts(s: &VariantSpec) -> (TokenStream, TokenStream, TokenStream, TokenStream) {
     let grpc = match &s.grpc {
         Some(g) => quote! { ::core::option::Option::Some(::coded_error::GrpcCode::#g) },
         None => quote! { ::core::option::Option::None },
@@ -285,7 +293,11 @@ fn override_parts(s: &VariantSpec) -> (TokenStream, TokenStream, TokenStream) {
         Some(m) => quote! { ::core::option::Option::Some(::coded_error::McpCode::#m) },
         None => quote! { ::core::option::Option::None },
     };
-    (grpc, http, mcp)
+    let acp = match &s.acp {
+        Some(a) => quote! { ::core::option::Option::Some::<i32>(#a) },
+        None => quote! { ::core::option::Option::None },
+    };
+    (grpc, http, mcp, acp)
 }
 
 fn wildcard_pattern(v: &Ident, fields: &Fields) -> TokenStream {

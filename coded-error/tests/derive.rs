@@ -65,7 +65,8 @@ fn codes_and_classes() {
         Overrides {
             grpc: Some(GrpcCode::NotFound),
             http: Some(404),
-            mcp: Some(McpCode::ResourceNotFound)
+            mcp: Some(McpCode::ResourceNotFound),
+            acp: None,
         }
     );
 

@@ -18,6 +18,9 @@ pub mod cli;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 
+#[cfg(feature = "acp")]
+pub mod acp;
+
 #[cfg(feature = "proto")]
 pub mod proto;
 
@@ -32,7 +35,7 @@ pub use code::{check_codes, is_valid_code, UNKNOWN_CODE};
 pub use coded_error_derive::CodedError;
 pub use fingerprint::fingerprint;
 pub use info::ErrorInfo;
-pub use overrides::{GrpcCode, McpCode, Overrides};
+pub use overrides::{is_valid_acp_code, GrpcCode, McpCode, Overrides};
 
 #[cfg(feature = "anyhow")]
 pub use carry::{

@@ -31,6 +31,7 @@ The derive supports enums only, not structs. With
 | `grpc` | tonic/gRPC status |
 | `http` | HTTP responses |
 | `mcp` | Model Context Protocol |
+| `acp` | Agent Client Protocol (plain `AcpError` data, no ACP crate) |
 | `cli` | command-line output |
 | `proto` | prost/protobuf |
 | `sqlx` | SQLx database errors (0.7 only) |
@@ -50,11 +51,20 @@ namespaces must be unique within a crate and across an aggregate checked with
 When converting an anyhow error with `into_anyhow` or `attach`, plain
 `err.downcast_ref::<T>()` no longer sees through `Coded`; use
 `coded_error::downcast_ref` instead. Anyhow-form mappings that carry a
-message (gRPC, MCP) send the whole context chain (`{:#}`). Wire mappings use
-`Display`.
+message (gRPC, MCP, ACP) send the whole context chain (`{:#}`). Wire mappings
+use `Display`.
+
+ACP errors are JSON-RPC: Logical maps to -32602 and every other class to
+-32603 (ACP reserves -32002 for resource-not-found, so Transient is told apart
+by `data.class`, not by number). `#[coded(acp = -32001)]` overrides the
+number; it must be a standard JSON-RPC code or in -32099..=-32000, checked at
+compile time. `data` is the `ErrorInfo` object, as in MCP, and a caller may
+insert keys of its own beside `code`, `class` and `fingerprint`.
+
 At a boundary facing an untrusted caller, use
 `grpc::to_status_anyhow_redacted(&err, source, "request failed")`,
-`mcp::to_mcp_error_anyhow_redacted`, or `http::to_http_anyhow_redacted`
+`mcp::to_mcp_error_anyhow_redacted`, `acp::to_acp_error_anyhow_redacted`, or
+`http::to_http_anyhow_redacted`
 (which returns the message beside `ErrorInfo` for the caller to place in its
 body). A logical typed error sends only its own `Display`; every other class,
 an `attach`ed chain and a relayed remote message send the fixed text. Codes,

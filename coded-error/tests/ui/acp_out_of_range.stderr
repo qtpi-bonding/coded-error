@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: acp code must be a standard JSON-RPC error code or in -32099..=-32000
+ --> tests/ui/acp_out_of_range.rs:2:35
+  |
+2 | #[derive(Debug, thiserror::Error, CodedError)]
+  |                                   ^^^^^^^^^^ evaluation of `_` failed here
