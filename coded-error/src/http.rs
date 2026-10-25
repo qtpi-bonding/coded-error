@@ -27,3 +27,17 @@ pub fn to_http<E: CodedError + ?Sized>(e: &E, source: &str) -> (u16, ErrorInfo) 
 pub fn to_http_anyhow(err: &anyhow::Error, source: &str) -> (u16, ErrorInfo) {
     from_facts(crate::facts_anyhow(err), source)
 }
+
+/// As `to_http_anyhow`, plus a message safe to show an untrusted caller,
+/// chosen as `grpc::to_status_anyhow_redacted` chooses its message.
+/// `ErrorInfo` stays the proto record; the caller decides where the message
+/// goes in its body.
+#[cfg(feature = "anyhow")]
+pub fn to_http_anyhow_redacted(
+    err: &anyhow::Error,
+    source: &str,
+    fixed: &str,
+) -> (u16, ErrorInfo, String) {
+    let (status, info) = to_http_anyhow(err, source);
+    (status, info, crate::carry::redacted_message(err, fixed))
+}

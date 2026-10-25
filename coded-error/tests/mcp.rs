@@ -47,3 +47,31 @@ fn anyhow_form_message_is_the_whole_chain() {
     assert_eq!(u.code, ErrorCode::INTERNAL_ERROR);
     assert_eq!(u.data.unwrap()["code"], "unknown");
 }
+
+#[cfg(feature = "anyhow")]
+#[test]
+fn redacted_form_keeps_only_a_logical_typed_message() {
+    use coded_error::mcp::{to_mcp_error_anyhow, to_mcp_error_anyhow_redacted};
+    const FIXED: &str = "request failed";
+    let logical = coded_error::into_anyhow(E::Missing).context("tenant t9");
+    let e = to_mcp_error_anyhow_redacted(&logical, "s", FIXED);
+    assert_eq!(e.message, "missing");
+    assert_eq!(e.code, ErrorCode::RESOURCE_NOT_FOUND);
+
+    let attached = coded_error::attach(anyhow::anyhow!("10.0.0.5 refused"), &E::Bad);
+    for err in [
+        coded_error::into_anyhow(E::Bug).context("db at 10.0.0.5"),
+        anyhow::anyhow!("10.0.0.5 refused"),
+        attached,
+        coded_error::from_remote(
+            Some("peer.x"),
+            Some(coded_error::ErrorClass::Logical),
+            "10.0.0.5".into(),
+        ),
+    ] {
+        let redacted = to_mcp_error_anyhow_redacted(&err, "s", FIXED);
+        let plain = to_mcp_error_anyhow(&err, "s");
+        assert_eq!(redacted.message, FIXED);
+        assert_eq!((redacted.code, redacted.data), (plain.code, plain.data));
+    }
+}

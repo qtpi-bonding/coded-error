@@ -60,12 +60,8 @@ pub fn to_status_anyhow(err: &anyhow::Error, source: &str) -> Status {
 /// from a remote status. The metadata is the same as `to_status_anyhow`'s.
 #[cfg(feature = "anyhow")]
 pub fn to_status_anyhow_redacted(err: &anyhow::Error, source: &str, fixed: &str) -> Status {
-    let facts = crate::facts_anyhow(err);
-    let message = crate::from_anyhow(err)
-        .filter(|_| facts.class == ErrorClass::Logical)
-        .and_then(|coded| coded.own_message())
-        .unwrap_or_else(|| fixed.to_owned());
-    status_from(facts, message, source)
+    let message = crate::carry::redacted_message(err, fixed);
+    status_from(crate::facts_anyhow(err), message, source)
 }
 
 /// Client side: read the facts back so callers branch on `code`, not text.

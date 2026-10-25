@@ -56,6 +56,32 @@ fn http_anyhow_forms() {
     );
 }
 
+#[cfg(all(feature = "http", feature = "anyhow"))]
+#[test]
+fn http_redacted_form_keeps_only_a_logical_typed_message() {
+    use coded_error::http::{to_http_anyhow, to_http_anyhow_redacted};
+    use coded_error::into_anyhow;
+    const FIXED: &str = "request failed";
+
+    let (status, info, message) =
+        to_http_anyhow_redacted(&into_anyhow(E::Missing).context("tenant t9"), "s", FIXED);
+    assert_eq!((status, info.code.as_str()), (404, "test.http.missing"));
+    assert_eq!(message, "missing");
+
+    let attached = coded_error::attach(anyhow::anyhow!("10.0.0.5 refused"), &E::Bad);
+    for err in [
+        into_anyhow(E::Bug).context("db at 10.0.0.5"),
+        into_anyhow(E::Down),
+        anyhow::anyhow!("10.0.0.5 refused"),
+        attached,
+        coded_error::from_remote(Some("peer.x"), Some(ErrorClass::Logical), "10.0.0.5".into()),
+    ] {
+        let (status, info, message) = to_http_anyhow_redacted(&err, "s", FIXED);
+        assert_eq!((status, info), to_http_anyhow(&err, "s"));
+        assert_eq!(message, FIXED);
+    }
+}
+
 #[cfg(feature = "cli")]
 #[test]
 fn cli_sysexits_and_repo_table() {

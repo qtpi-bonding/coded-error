@@ -34,8 +34,8 @@ impl Coded {
     /// The wrapped typed error's own Display. `None` for an attached anyhow
     /// chain or a relayed remote message, whose text this process did not
     /// write and may carry anything.
-    #[cfg(feature = "grpc")]
-    pub(crate) fn own_message(&self) -> Option<String> {
+    #[cfg(any(feature = "grpc", feature = "http", feature = "mcp"))]
+    fn own_message(&self) -> Option<String> {
         match &self.inner {
             Inner::Typed(b) if !b.is::<Remote>() => Some(b.to_string()),
             _ => None,
@@ -237,6 +237,18 @@ pub fn downcast_ref<T: Error + Send + Sync + 'static>(err: &anyhow::Error) -> Op
 /// Facts for any anyhow error: the nearest `Coded`, else `Uncoded::FACTS`.
 pub fn facts_anyhow(err: &anyhow::Error) -> Facts {
     from_anyhow(err).map(Coded::facts).unwrap_or(Uncoded::FACTS)
+}
+
+/// The message a boundary facing an untrusted caller sends: a logical typed
+/// error's own Display, without the context added around it; `fixed` for
+/// everything else (other classes, uncoded errors, chains coded with
+/// `attach`, messages relayed from a remote).
+#[cfg(any(feature = "grpc", feature = "http", feature = "mcp"))]
+pub(crate) fn redacted_message(err: &anyhow::Error, fixed: &str) -> String {
+    from_anyhow(err)
+        .filter(|coded| coded.facts.class == ErrorClass::Logical)
+        .and_then(Coded::own_message)
+        .unwrap_or_else(|| fixed.to_owned())
 }
 
 /// An untyped error. Counting its `unknown` code measures the adoption gap.

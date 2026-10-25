@@ -49,12 +49,18 @@ namespaces must be unique within a crate and across an aggregate checked with
 
 When converting an anyhow error with `into_anyhow` or `attach`, plain
 `err.downcast_ref::<T>()` no longer sees through `Coded`; use
-`coded_error::downcast_ref` instead. Anyhow-form mappings send the whole
-context chain (`{:#}`) as the message. Wire mappings use `Display`.
+`coded_error::downcast_ref` instead. Anyhow-form mappings that carry a
+message (gRPC, MCP) send the whole context chain (`{:#}`). Wire mappings use
+`Display`.
 At a boundary facing an untrusted caller, use
-`grpc::to_status_anyhow_redacted(&err, source, "request failed")`. A logical
-error sends only its own `Display`, and every other class sends the fixed
-text. The metadata is unchanged.
+`grpc::to_status_anyhow_redacted(&err, source, "request failed")`,
+`mcp::to_mcp_error_anyhow_redacted`, or `http::to_http_anyhow_redacted`
+(which returns the message beside `ErrorInfo` for the caller to place in its
+body). A logical typed error sends only its own `Display`; every other class,
+an `attach`ed chain and a relayed remote message send the fixed text. Codes,
+statuses and metadata are unchanged. A logical variant whose `#[error]`
+interpolates caller input sends that input back, so keep such Display text
+to what the caller already knows.
 
 ## Carrying a remote code (client side)
 

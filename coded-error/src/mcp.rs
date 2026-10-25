@@ -20,3 +20,12 @@ pub fn to_mcp_error_anyhow(err: &anyhow::Error, source: &str) -> ErrorData {
     // `{:#}`: the whole context chain, same choice as the gRPC form.
     from_facts(crate::facts_anyhow(err), format!("{err:#}"), source)
 }
+
+/// As `to_mcp_error_anyhow`, for an untrusted caller: the message is chosen
+/// as `grpc::to_status_anyhow_redacted` chooses its message. The code and
+/// data are the same as `to_mcp_error_anyhow`'s.
+#[cfg(feature = "anyhow")]
+pub fn to_mcp_error_anyhow_redacted(err: &anyhow::Error, source: &str, fixed: &str) -> ErrorData {
+    let message = crate::carry::redacted_message(err, fixed);
+    from_facts(crate::facts_anyhow(err), message, source)
+}
