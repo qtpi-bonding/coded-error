@@ -31,6 +31,17 @@ impl Coded {
         self.facts
     }
 
+    /// The wrapped typed error's own Display. `None` for an attached anyhow
+    /// chain or a relayed remote message, whose text this process did not
+    /// write and may carry anything.
+    #[cfg(feature = "grpc")]
+    pub(crate) fn own_message(&self) -> Option<String> {
+        match &self.inner {
+            Inner::Typed(b) if !b.is::<Remote>() => Some(b.to_string()),
+            _ => None,
+        }
+    }
+
     /// Downcast the wrapped error to a caller's own type.
     pub fn downcast_ref<T: Error + Send + Sync + 'static>(&self) -> Option<&T> {
         match &self.inner {

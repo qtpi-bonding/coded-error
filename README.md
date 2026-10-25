@@ -51,6 +51,10 @@ When converting an anyhow error with `into_anyhow` or `attach`, plain
 `err.downcast_ref::<T>()` no longer sees through `Coded`; use
 `coded_error::downcast_ref` instead. Anyhow-form mappings send the whole
 context chain (`{:#}`) as the message. Wire mappings use `Display`.
+At a boundary facing an untrusted caller, use
+`grpc::to_status_anyhow_redacted(&err, source, "request failed")`. A logical
+error sends only its own `Display`, and every other class sends the fixed
+text. The metadata is unchanged.
 
 ## Carrying a remote code (client side)
 

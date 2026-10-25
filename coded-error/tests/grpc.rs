@@ -171,3 +171,62 @@ mod remote {
         );
     }
 }
+
+#[cfg(feature = "anyhow")]
+mod redacted {
+    use super::E;
+    use coded_error::grpc::{to_status_anyhow, to_status_anyhow_redacted, CodedStatus};
+    use coded_error::into_anyhow;
+    use tonic::Code;
+
+    const FIXED: &str = "request failed";
+
+    #[test]
+    fn a_logical_error_keeps_its_own_text_without_context() {
+        let err = into_anyhow(E::NotFound).context("looking up action a1 in tenant t9");
+        let status = to_status_anyhow_redacted(&err, "m", FIXED);
+        assert_eq!(status.code(), Code::NotFound);
+        assert_eq!(status.message(), "no such action");
+    }
+
+    #[test]
+    fn every_other_class_sends_the_fixed_text() {
+        for (err, code) in [
+            (into_anyhow(E::Internal), Code::Internal),
+            (into_anyhow(E::Down), Code::Unavailable),
+            (into_anyhow(E::Unknown), Code::Unknown),
+            (
+                anyhow::anyhow!("connection to 10.0.0.5 refused"),
+                Code::Unknown,
+            ),
+        ] {
+            let status = to_status_anyhow_redacted(&err, "m", FIXED);
+            assert_eq!(status.code(), code);
+            assert_eq!(status.message(), FIXED);
+        }
+    }
+
+    #[test]
+    fn a_logical_attached_chain_or_relayed_message_sends_the_fixed_text() {
+        let attached = coded_error::attach(
+            anyhow::anyhow!("connection to 10.0.0.5 refused").context("tenant t9"),
+            &E::Missing,
+        );
+        let relayed =
+            coded_error::grpc::from_status(&coded_error::grpc::to_status(&E::Missing, "peer"));
+        for err in [attached, relayed] {
+            let status = to_status_anyhow_redacted(&err, "m", FIXED);
+            assert_eq!(status.code(), Code::InvalidArgument);
+            assert_eq!(status.message(), FIXED);
+        }
+    }
+
+    #[test]
+    fn the_metadata_matches_the_unredacted_status() {
+        let err = into_anyhow(E::Down).context("db at 10.0.0.5");
+        let plain = CodedStatus::from(&to_status_anyhow(&err, "m"));
+        let redacted = CodedStatus::from(&to_status_anyhow_redacted(&err, "m", FIXED));
+        assert_eq!(redacted, plain);
+        assert_eq!(redacted.code.as_deref(), Some("test.rpc.db_down"));
+    }
+}

@@ -53,6 +53,21 @@ pub fn to_status_anyhow(err: &anyhow::Error, source: &str) -> Status {
     status_from(crate::facts_anyhow(err), format!("{err:#}"), source)
 }
 
+/// As `to_status_anyhow`, for a boundary facing an untrusted caller. A
+/// logical typed error (`into_anyhow`) keeps its own Display, without the
+/// context added around it. Everything else sends `fixed` instead: other
+/// classes, uncoded errors, chains coded with `attach`, and messages relayed
+/// from a remote status. The metadata is the same as `to_status_anyhow`'s.
+#[cfg(feature = "anyhow")]
+pub fn to_status_anyhow_redacted(err: &anyhow::Error, source: &str, fixed: &str) -> Status {
+    let facts = crate::facts_anyhow(err);
+    let message = crate::from_anyhow(err)
+        .filter(|_| facts.class == ErrorClass::Logical)
+        .and_then(|coded| coded.own_message())
+        .unwrap_or_else(|| fixed.to_owned());
+    status_from(facts, message, source)
+}
+
 /// Client side: read the facts back so callers branch on `code`, not text.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CodedStatus {
