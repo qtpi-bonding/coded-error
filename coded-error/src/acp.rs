@@ -23,8 +23,9 @@ fn default_code(class: ErrorClass) -> i32 {
 }
 
 fn from_facts(facts: Facts, message: String, source: &str) -> AcpError {
-    let data = serde_json::to_value(ErrorInfo::from_facts(&facts, source))
+    let mut data = serde_json::to_value(ErrorInfo::from_facts(&facts, source))
         .expect("ErrorInfo serializes to a JSON object");
+    data["chain"] = serde_json::json!([facts.code]);
     AcpError {
         code: facts
             .overrides
@@ -35,6 +36,20 @@ fn from_facts(facts: Facts, message: String, source: &str) -> AcpError {
     }
 }
 
+#[cfg(feature = "anyhow")]
+fn from_anyhow(err: &anyhow::Error, source: &str, message: String) -> AcpError {
+    let mut out = from_facts(crate::facts_anyhow(err), message, source);
+    out.data["chain"] = serde_json::Value::Array(
+        crate::chain_anyhow(err)
+            .into_iter()
+            .map(|link| {
+                serde_json::Value::String(link.code.unwrap_or(crate::UNKNOWN_CODE).to_owned())
+            })
+            .collect(),
+    );
+    out
+}
+
 /// Convert a coded error into an ACP error. The message is its `Display`.
 pub fn to_acp_error<E: CodedError + ?Sized>(e: &E, source: &str) -> AcpError {
     from_facts(Facts::of(e), e.to_string(), source)
@@ -43,7 +58,7 @@ pub fn to_acp_error<E: CodedError + ?Sized>(e: &E, source: &str) -> AcpError {
 #[cfg(feature = "anyhow")]
 pub fn to_acp_error_anyhow(err: &anyhow::Error, source: &str) -> AcpError {
     // `{:#}`: the whole context chain, same choice as the gRPC and MCP forms.
-    from_facts(crate::facts_anyhow(err), format!("{err:#}"), source)
+    from_anyhow(err, source, format!("{err:#}"))
 }
 
 /// As `to_acp_error_anyhow`, for an untrusted caller: the message is chosen
@@ -52,5 +67,5 @@ pub fn to_acp_error_anyhow(err: &anyhow::Error, source: &str) -> AcpError {
 #[cfg(feature = "anyhow")]
 pub fn to_acp_error_anyhow_redacted(err: &anyhow::Error, source: &str, fixed: &str) -> AcpError {
     let message = crate::carry::redacted_message(err, fixed);
-    from_facts(crate::facts_anyhow(err), message, source)
+    from_anyhow(err, source, message)
 }

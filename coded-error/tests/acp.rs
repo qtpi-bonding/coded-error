@@ -52,10 +52,10 @@ fn class_defaults_and_override() {
 fn data_is_the_error_info_object_and_callers_can_add_keys() {
     let mut e = to_acp_error(&E::AlreadySeen, "s");
     assert_eq!(e.message, "already seen");
-    assert_eq!(
-        e.data,
-        serde_json::to_value(ErrorInfo::of(&E::AlreadySeen, "s")).unwrap()
-    );
+    let info = serde_json::to_value(ErrorInfo::of(&E::AlreadySeen, "s")).unwrap();
+    assert_eq!(e.data["code"], info["code"]);
+    assert_eq!(e.data["class"], info["class"]);
+    assert_eq!(e.data["fingerprint"], info["fingerprint"]);
     assert_eq!(e.data["code"], "test.acp.already_seen");
     assert_eq!(e.data["class"], "logical");
     e.data
@@ -63,6 +63,18 @@ fn data_is_the_error_info_object_and_callers_can_add_keys() {
         .unwrap()
         .insert("reason".into(), "already_seen_by_agent".into());
     assert_eq!(e.data["reason"], "already_seen_by_agent");
+}
+
+#[cfg(feature = "anyhow")]
+#[test]
+fn acp_and_mcp_data_carry_chain_codes() {
+    use coded_error::acp::to_acp_error_anyhow;
+    let err = coded_error::into_anyhow(E::Bad).context("loading");
+    let data = to_acp_error_anyhow(&err, "s").data;
+    assert_eq!(
+        data["chain"],
+        serde_json::json!(["unknown", "test.acp.bad"])
+    );
 }
 
 #[test]

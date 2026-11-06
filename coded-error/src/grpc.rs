@@ -9,6 +9,7 @@ pub const CODE_KEY: &str = "x-error-code";
 pub const CLASS_KEY: &str = "x-error-class";
 /// Metadata key carrying the error fingerprint.
 pub const FINGERPRINT_KEY: &str = "x-error-fingerprint";
+pub const CHAIN_KEY: &str = "x-error-chain";
 
 fn default_code(class: ErrorClass) -> GrpcCode {
     match class {
@@ -48,9 +49,23 @@ pub fn to_status<E: CodedError + ?Sized>(e: &E, source: &str) -> Status {
 }
 
 #[cfg(feature = "anyhow")]
+fn add_chain_metadata(status: &mut Status, err: &anyhow::Error) {
+    let codes = crate::chain_anyhow(err)
+        .iter()
+        .map(|l| l.code.unwrap_or(crate::UNKNOWN_CODE))
+        .collect::<Vec<_>>()
+        .join(",");
+    if let Ok(v) = MetadataValue::try_from(codes) {
+        status.metadata_mut().insert(CHAIN_KEY, v);
+    }
+}
+
+#[cfg(feature = "anyhow")]
 pub fn to_status_anyhow(err: &anyhow::Error, source: &str) -> Status {
     // `{:#}`: the whole context chain, as operators expect (see the design's Display-on-the-wire note).
-    status_from(crate::facts_anyhow(err), format!("{err:#}"), source)
+    let mut status = status_from(crate::facts_anyhow(err), format!("{err:#}"), source);
+    add_chain_metadata(&mut status, err);
+    status
 }
 
 /// As `to_status_anyhow`, for a boundary facing an untrusted caller. A
@@ -61,7 +76,9 @@ pub fn to_status_anyhow(err: &anyhow::Error, source: &str) -> Status {
 #[cfg(feature = "anyhow")]
 pub fn to_status_anyhow_redacted(err: &anyhow::Error, source: &str, fixed: &str) -> Status {
     let message = crate::carry::redacted_message(err, fixed);
-    status_from(crate::facts_anyhow(err), message, source)
+    let mut status = status_from(crate::facts_anyhow(err), message, source);
+    add_chain_metadata(&mut status, err);
+    status
 }
 
 /// Client side: read the facts back so callers branch on `code`, not text.
@@ -70,6 +87,7 @@ pub struct CodedStatus {
     pub code: Option<String>,
     pub class: Option<ErrorClass>,
     pub fingerprint: Option<String>,
+    pub chain: Vec<String>,
 }
 
 impl From<&Status> for CodedStatus {
@@ -84,6 +102,9 @@ impl From<&Status> for CodedStatus {
             code: get(CODE_KEY),
             class: get(CLASS_KEY).and_then(|c| c.parse().ok()),
             fingerprint: get(FINGERPRINT_KEY),
+            chain: get(CHAIN_KEY)
+                .map(|v| v.split(',').map(str::to_owned).collect())
+                .unwrap_or_default(),
         }
     }
 }
@@ -102,5 +123,26 @@ pub fn from_status(status: &Status) -> anyhow::Error {
 /// As `from_status`, for callers that already extracted the `CodedStatus`.
 #[cfg(feature = "anyhow")]
 pub fn from_coded_status(coded: &CodedStatus, message: &str) -> anyhow::Error {
-    crate::from_remote(coded.code.as_deref(), coded.class, message.to_owned())
+    // The wire chain includes the status' own code.  That code is already
+    // represented by the Remote layer, so remove its first occurrence before
+    // storing the remaining remote links.
+    let mut removed_own = false;
+    let chain = coded
+        .chain
+        .iter()
+        .filter_map(|code| {
+            if !removed_own && coded.code.as_deref() == Some(code.as_str()) {
+                removed_own = true;
+                None
+            } else {
+                Some(code.as_str())
+            }
+        })
+        .collect::<Vec<_>>();
+    crate::from_remote_chain(
+        coded.code.as_deref(),
+        coded.class,
+        message.to_owned(),
+        &chain,
+    )
 }

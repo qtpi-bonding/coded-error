@@ -54,6 +54,25 @@ When converting an anyhow error with `into_anyhow` or `attach`, plain
 message (gRPC, MCP, ACP) send the whole context chain (`{:#}`). Wire mappings
 use `Display`.
 
+## Error chains
+
+The `anyhow` feature provides `chain_anyhow(&err)`; the core form is
+`chain(&(dyn std::error::Error + 'static))`. Both return `Vec<ChainLink>`.
+Each link contains an optional `code`, `class` and `type_name`, its complete
+`message`, and an `origin` of either `Origin::Own` or `Origin::External`.
+`Own` identifies a typed error carried by `into_anyhow`; anyhow context,
+remote errors and ordinary standard-library errors are `External`. Derived
+`CodedError` implementations report their enum's fully qualified Rust type
+name, while other layers have no type name. Remote chains retain their codes,
+with empty message text for the re-recorded links.
+
+The gRPC anyhow mapping writes the chain codes to `x-error-chain`, joined by
+commas; links without a code are written as `unknown`. `from_status` reads
+that metadata and preserves the remote chain when the status is re-recorded.
+ACP and MCP anyhow mappings put the same codes in `data.chain` as a JSON
+array. The first element is the mapped error's code, followed by the chain's
+additional links.
+
 ACP errors are JSON-RPC: Logical maps to -32602 and every other class to
 -32603 (ACP reserves -32002 for resource-not-found, so Transient is told apart
 by `data.class`, not by number). `#[coded(acp = -32001)]` overrides the

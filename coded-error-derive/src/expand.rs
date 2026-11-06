@@ -131,6 +131,7 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         impl #impl_g ::coded_error::CodedError for #name #ty_g #where_g {
             fn code(&self) -> &'static str { match self { #(#code_arms,)* } }
             fn class(&self) -> ::coded_error::ErrorClass { match self { #(#class_arms,)* } }
+            fn type_name(&self) -> &'static str { ::core::any::type_name::<Self>() }
             fn overrides(&self) -> ::coded_error::Overrides { match self { #(#override_arms,)* } }
         }
         impl #impl_g #name #ty_g #where_g {

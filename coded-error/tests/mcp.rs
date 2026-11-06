@@ -27,9 +27,13 @@ fn class_defaults_override_message_and_data() {
     assert_eq!(to_mcp_error(&E::Bug, "s").code, ErrorCode::INTERNAL_ERROR);
     let e = to_mcp_error(&E::Missing, "s");
     assert_eq!(e.message, "missing");
+    let info = serde_json::to_value(ErrorInfo::of(&E::Missing, "s")).unwrap();
+    assert_eq!(e.data.as_ref().unwrap()["code"], info["code"]);
+    assert_eq!(e.data.as_ref().unwrap()["class"], info["class"]);
+    assert_eq!(e.data.as_ref().unwrap()["fingerprint"], info["fingerprint"]);
     assert_eq!(
-        e.data,
-        Some(serde_json::to_value(ErrorInfo::of(&E::Missing, "s")).unwrap())
+        e.data.as_ref().unwrap()["chain"],
+        serde_json::json!(["test.mcp.missing"])
     );
 }
 
@@ -46,6 +50,18 @@ fn anyhow_form_message_is_the_whole_chain() {
     let u = to_mcp_error_anyhow(&anyhow::anyhow!("boom"), "s");
     assert_eq!(u.code, ErrorCode::INTERNAL_ERROR);
     assert_eq!(u.data.unwrap()["code"], "unknown");
+}
+
+#[cfg(feature = "anyhow")]
+#[test]
+fn acp_and_mcp_data_carry_chain_codes() {
+    use coded_error::mcp::to_mcp_error_anyhow;
+    let err = coded_error::into_anyhow(E::Bad).context("loading");
+    let data = to_mcp_error_anyhow(&err, "s").data.unwrap();
+    assert_eq!(
+        data["chain"],
+        serde_json::json!(["unknown", "test.mcp.bad"])
+    );
 }
 
 #[cfg(feature = "anyhow")]

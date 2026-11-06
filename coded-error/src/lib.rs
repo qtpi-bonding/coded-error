@@ -1,5 +1,6 @@
 //! Typed, coded errors. See the repository README for the model.
 
+mod chain;
 mod class;
 mod code;
 mod fingerprint;
@@ -30,6 +31,9 @@ pub mod sqlx;
 #[cfg(feature = "anyhow")]
 mod carry;
 
+#[cfg(feature = "anyhow")]
+pub use chain::chain_anyhow;
+pub use chain::{chain, ChainLink, Origin};
 pub use class::{ErrorClass, ParseClassError};
 pub use code::{check_codes, is_valid_code, UNKNOWN_CODE};
 pub use coded_error_derive::CodedError;
@@ -39,8 +43,8 @@ pub use overrides::{is_valid_acp_code, GrpcCode, McpCode, Overrides};
 
 #[cfg(feature = "anyhow")]
 pub use carry::{
-    attach, downcast_ref, facts_anyhow, from_anyhow, from_remote, into_anyhow, Coded, ResultExt,
-    Uncoded,
+    attach, downcast_ref, facts_anyhow, from_anyhow, from_remote, from_remote_chain, into_anyhow,
+    Coded, ResultExt, Uncoded,
 };
 
 /// An error with a stable, namespaced code and a class.
@@ -49,6 +53,9 @@ pub trait CodedError: std::error::Error {
     fn code(&self) -> &'static str;
     /// Runtime value: a variant may compute it from its fields.
     fn class(&self) -> ErrorClass;
+    fn type_name(&self) -> &'static str {
+        "unknown"
+    }
     /// Per-variant boundary overrides.
     fn overrides(&self) -> Overrides {
         Overrides::NONE

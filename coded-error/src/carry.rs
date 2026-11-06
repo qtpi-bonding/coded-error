@@ -24,11 +24,34 @@ impl Inner {
 pub struct Coded {
     facts: Facts,
     inner: Inner,
+    type_name: &'static str,
 }
 
 impl Coded {
     pub fn facts(&self) -> Facts {
         self.facts
+    }
+
+    pub(crate) fn chain_link(&self) -> crate::ChainLink {
+        let own = matches!(&self.inner, Inner::Typed(b) if !b.is::<Remote>());
+        crate::ChainLink {
+            code: Some(self.facts.code),
+            class: Some(self.facts.class),
+            type_name: own.then_some(self.type_name),
+            origin: if own {
+                crate::Origin::Own
+            } else {
+                crate::Origin::External
+            },
+            message: self.to_string(),
+        }
+    }
+
+    pub(crate) fn remote_chain(&self) -> Option<&[&'static str]> {
+        match &self.inner {
+            Inner::Typed(b) => b.downcast_ref::<Remote>().map(|r| r.chain.as_slice()),
+            _ => None,
+        }
     }
 
     /// The wrapped typed error's own Display. `None` for an attached anyhow
@@ -89,20 +112,25 @@ impl CodedError for Coded {
 /// Raise a typed error into anyhow with its facts attached.
 pub fn into_anyhow<E: CodedError + Send + Sync + 'static>(e: E) -> anyhow::Error {
     let facts = Facts::of(&e);
+    let type_name = e.type_name();
     anyhow::Error::new(Coded {
         facts,
         inner: Inner::Typed(Box::new(e)),
+        type_name,
     })
 }
 
 /// A failure reported by a remote peer (a gRPC status, say). Display is the
 /// remote message.
 #[derive(Debug)]
-struct Remote(String);
+struct Remote {
+    message: String,
+    chain: Vec<&'static str>,
+}
 
 impl fmt::Display for Remote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
+        f.write_str(&self.message)
     }
 }
 
@@ -197,8 +225,20 @@ pub fn from_remote(
     class: Option<ErrorClass>,
     message: String,
 ) -> anyhow::Error {
+    from_remote_chain(code, class, message, &[])
+}
+
+pub fn from_remote_chain(
+    code: Option<&str>,
+    class: Option<ErrorClass>,
+    message: String,
+    chain: &[&str],
+) -> anyhow::Error {
     if code.is_none() && class.is_none() {
-        return anyhow::Error::new(Remote(message));
+        return anyhow::Error::new(Remote {
+            message,
+            chain: chain.iter().map(|c| intern_code(c)).collect(),
+        });
     }
     let facts = Facts {
         code: code.map_or(UNKNOWN_CODE, intern_code),
@@ -207,7 +247,11 @@ pub fn from_remote(
     };
     anyhow::Error::new(Coded {
         facts,
-        inner: Inner::Typed(Box::new(Remote(message))),
+        inner: Inner::Typed(Box::new(Remote {
+            message,
+            chain: chain.iter().map(|c| intern_code(c)).collect(),
+        })),
+        type_name: "unknown",
     })
 }
 
@@ -217,6 +261,7 @@ pub fn attach<E: CodedError + ?Sized>(err: anyhow::Error, typed: &E) -> anyhow::
     anyhow::Error::new(Coded {
         facts,
         inner: Inner::Chain(err),
+        type_name: "unknown",
     })
 }
 

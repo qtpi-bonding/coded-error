@@ -84,6 +84,29 @@ fn anyhow_message_is_the_whole_chain() {
 }
 
 #[cfg(feature = "anyhow")]
+#[test]
+fn grpc_status_carries_x_error_chain() {
+    use coded_error::chain_anyhow;
+    use coded_error::grpc::{from_status, to_status_anyhow, CHAIN_KEY};
+    use coded_error::into_anyhow;
+
+    let err = into_anyhow(E::NotFound).context("loading action");
+    let status = to_status_anyhow(&err, "m");
+    assert_eq!(
+        status.metadata().get(CHAIN_KEY).unwrap().to_str().unwrap(),
+        "unknown,test.rpc.not_found"
+    );
+
+    let remote = from_status(&status);
+    let links = chain_anyhow(&remote);
+    assert_eq!(links[0].code, Some("test.rpc.not_found"));
+    assert_eq!(links[0].origin, coded_error::Origin::External);
+    assert_eq!(links[1].code, Some("unknown"));
+    assert_eq!(links[1].message, "");
+    assert_eq!(links.len(), 2);
+}
+
+#[cfg(feature = "anyhow")]
 mod remote {
     use super::*;
     use coded_error::grpc::from_status;
