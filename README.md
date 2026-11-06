@@ -70,8 +70,9 @@ The gRPC anyhow mapping writes the chain codes to `x-error-chain`, joined by
 commas; links without a code are written as `unknown`. `from_status` reads
 that metadata and preserves the remote chain when the status is re-recorded.
 ACP and MCP anyhow mappings put the same codes in `data.chain` as a JSON
-array. The first element is the mapped error's code, followed by the chain's
-additional links.
+array in outermost-to-innermost order. Thus a context layer may make the first
+element `unknown`; it is the outermost link's code, not necessarily the mapped
+error's own code.
 
 ACP errors are JSON-RPC: Logical maps to -32602 and every other class to
 -32603 (ACP reserves -32002 for resource-not-found, so Transient is told apart

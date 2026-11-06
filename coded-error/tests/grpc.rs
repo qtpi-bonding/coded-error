@@ -99,11 +99,55 @@ fn grpc_status_carries_x_error_chain() {
 
     let remote = from_status(&status);
     let links = chain_anyhow(&remote);
-    assert_eq!(links[0].code, Some("test.rpc.not_found"));
+    assert_eq!(links[0].code, Some("unknown"));
     assert_eq!(links[0].origin, coded_error::Origin::External);
-    assert_eq!(links[1].code, Some("unknown"));
-    assert_eq!(links[1].message, "");
+    assert_eq!(links[0].message, "");
+    assert_eq!(links[1].code, Some("test.rpc.not_found"));
+    assert_eq!(links[1].message, "loading action: no such action");
     assert_eq!(links.len(), 2);
+}
+
+#[cfg(feature = "anyhow")]
+#[test]
+fn chain_survives_two_grpc_hops_unchanged() {
+    use coded_error::grpc::{from_status, to_status_anyhow, CHAIN_KEY};
+    use coded_error::{chain_anyhow, from_remote_chain};
+
+    let err = from_remote_chain(
+        Some("test.rpc.not_found"),
+        Some(ErrorClass::Logical),
+        "remote message".into(),
+        &["test.rpc.not_found", "unknown", "test.rpc.not_found"],
+    )
+    .context("outer context");
+    let first = to_status_anyhow(&err, "hop1");
+    let first_chain = first
+        .metadata()
+        .get(CHAIN_KEY)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let second_err = from_status(&first);
+    let second = to_status_anyhow(&second_err, "hop2");
+    let second_chain = second
+        .metadata()
+        .get(CHAIN_KEY)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(first_chain, second_chain);
+    assert_eq!(
+        chain_anyhow(&from_status(&first))
+            .iter()
+            .map(|l| l.code)
+            .collect::<Vec<_>>(),
+        chain_anyhow(&from_status(&second))
+            .iter()
+            .map(|l| l.code)
+            .collect::<Vec<_>>()
+    );
 }
 
 #[cfg(feature = "anyhow")]
@@ -251,5 +295,16 @@ mod redacted {
         let redacted = CodedStatus::from(&to_status_anyhow_redacted(&err, "m", FIXED));
         assert_eq!(redacted, plain);
         assert_eq!(redacted.code.as_deref(), Some("test.rpc.db_down"));
+    }
+
+    #[test]
+    fn redacted_and_unredacted_status_carry_the_same_chain() {
+        let err = into_anyhow(E::Down).context("db at 10.0.0.5");
+        let plain = to_status_anyhow(&err, "m");
+        let redacted = to_status_anyhow_redacted(&err, "m", FIXED);
+        assert_eq!(
+            plain.metadata().get("x-error-chain").unwrap(),
+            redacted.metadata().get("x-error-chain").unwrap()
+        );
     }
 }

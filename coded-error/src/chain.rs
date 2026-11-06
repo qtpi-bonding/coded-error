@@ -39,15 +39,40 @@ pub fn chain(e: &(dyn Error + 'static)) -> Vec<ChainLink> {
     let mut cur: Option<&(dyn Error + 'static)> = Some(e);
     while let Some(err) = cur {
         if let Some((link, remote_codes)) = coded_link(err) {
-            out.push(link);
             if let Some(codes) = remote_codes {
-                out.extend(codes.into_iter().map(|code| ChainLink {
-                    code: Some(code),
-                    class: None,
-                    type_name: None,
-                    origin: Origin::External,
-                    message: String::new(),
-                }));
+                if codes.is_empty() {
+                    out.push(link);
+                } else {
+                    let own_code = link.code;
+                    let mut message_assigned = false;
+                    let first_expanded = out.len();
+                    out.extend(codes.into_iter().map(|code| {
+                        let is_message = !message_assigned && own_code == Some(code);
+                        if is_message {
+                            message_assigned = true;
+                        }
+                        ChainLink {
+                            code: Some(code),
+                            class: None,
+                            type_name: None,
+                            origin: Origin::External,
+                            message: if is_message {
+                                link.message.clone()
+                            } else {
+                                String::new()
+                            },
+                        }
+                    }));
+                    if !message_assigned {
+                        if let Some(first) = out.get_mut(first_expanded) {
+                            // The first expanded link owns the remote text
+                            // when the peer omitted the status code.
+                            first.message = link.message;
+                        }
+                    }
+                }
+            } else {
+                out.push(link);
             }
         } else {
             out.push(external_link(err));

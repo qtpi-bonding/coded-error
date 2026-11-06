@@ -45,7 +45,12 @@ fn status_from(facts: Facts, message: String, source: &str) -> Status {
 
 /// Convert a coded error into a gRPC status with coded metadata.
 pub fn to_status<E: CodedError + ?Sized>(e: &E, source: &str) -> Status {
-    status_from(Facts::of(e), e.to_string(), source)
+    let mut status = status_from(Facts::of(e), e.to_string(), source);
+    let code = e.code();
+    if let Ok(value) = MetadataValue::try_from(code) {
+        status.metadata_mut().insert(CHAIN_KEY, value);
+    }
+    status
 }
 
 #[cfg(feature = "anyhow")]
@@ -123,22 +128,7 @@ pub fn from_status(status: &Status) -> anyhow::Error {
 /// As `from_status`, for callers that already extracted the `CodedStatus`.
 #[cfg(feature = "anyhow")]
 pub fn from_coded_status(coded: &CodedStatus, message: &str) -> anyhow::Error {
-    // The wire chain includes the status' own code.  That code is already
-    // represented by the Remote layer, so remove its first occurrence before
-    // storing the remaining remote links.
-    let mut removed_own = false;
-    let chain = coded
-        .chain
-        .iter()
-        .filter_map(|code| {
-            if !removed_own && coded.code.as_deref() == Some(code.as_str()) {
-                removed_own = true;
-                None
-            } else {
-                Some(code.as_str())
-            }
-        })
-        .collect::<Vec<_>>();
+    let chain = coded.chain.iter().map(String::as_str).collect::<Vec<_>>();
     crate::from_remote_chain(
         coded.code.as_deref(),
         coded.class,
