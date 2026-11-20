@@ -142,6 +142,7 @@ mod catalog {
 
     #[derive(Debug, thiserror::Error, CodedError)]
     #[coded(namespace = "test.outer")]
+    #[allow(dead_code)]
     pub enum Outer {
         #[error("own")]
         #[coded(code = "own", class = Logical)]
@@ -154,7 +155,7 @@ mod catalog {
         InnerAgain(CatalogError),
         #[error(transparent)]
         #[coded(transparent)]
-        Plain(std::io::Error),
+        Plain(super::StorageError),
     }
 
     fn codes<E: CodeCatalog>() -> Vec<CodeEntry> {
