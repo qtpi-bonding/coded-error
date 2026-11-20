@@ -26,6 +26,7 @@ struct VariantSpec {
     http: Option<LitInt>,
     mcp: Option<Ident>,
     acp: Option<Expr>,
+    catalog: bool,
 }
 
 pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
@@ -85,6 +86,12 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
             ClassSource::Transparent => {
                 let inner = format_ident!("__inner");
                 let pat = single_field_pattern(v, &s.fields, &inner)?;
+                if s.catalog {
+                    let ty = &s.fields.iter().next().expect("checked").ty;
+                    catalog.push(quote! {
+                        __entries.extend(<#ty as ::coded_error::CodeCatalog>::codes());
+                    });
+                }
                 let (grpc, http, mcp, acp) = override_parts(s);
                 code_arms.push(quote! { #pat => ::coded_error::CodedError::code(#inner) });
                 class_arms.push(quote! { #pat => ::coded_error::CodedError::class(#inner) });
@@ -109,13 +116,15 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
                 );
                 asserts.push(quote! { const _: () = ::core::assert!(::coded_error::is_valid_code(#full_code), #msg); });
                 all_codes.push(full_code.clone());
-                // Only a fixed class is static; from(field) / class_with are
-                // computed at runtime, so those variants stay out of CODES.
-                if let ClassSource::Fixed(c) = other {
-                    catalog.push(quote! {
-                        ::coded_error::CodeEntry { code: #full_code, class: ::coded_error::ErrorClass::#c }
-                    });
-                }
+                let class_tok = match other {
+                    ClassSource::Fixed(c) => {
+                        quote! { ::core::option::Option::Some(::coded_error::ErrorClass::#c) }
+                    }
+                    _ => quote! { ::core::option::Option::None },
+                };
+                catalog.push(quote! {
+                    __entries.push(::coded_error::CodeEntry { code: #full_code, class: #class_tok });
+                });
                 let wild = wildcard_pattern(v, &s.fields);
                 code_arms.push(quote! { #wild => #full_code });
                 override_arms.push(quote! { #wild => #own });
@@ -146,7 +155,11 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
             pub const ALL_CODES: &'static [&'static str] = &[#(#all_codes),*];
         }
         impl #impl_g ::coded_error::CodeCatalog for #name #ty_g #where_g {
-            const CODES: &'static [::coded_error::CodeEntry] = &[#(#catalog),*];
+            fn codes() -> ::std::vec::Vec<::coded_error::CodeEntry> {
+                let mut __entries = ::std::vec::Vec::new();
+                #(#catalog)*
+                ::coded_error::dedup_entries(__entries)
+            }
         }
     })
 }
@@ -180,6 +193,7 @@ fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
     }
     let (mut code, mut grpc, mut http, mut mcp, mut acp) = (None, None, None, None, None);
     let mut classes = Vec::new();
+    let mut catalog = false;
     for attr in attrs {
         attr.parse_nested_meta(|m| {
             if m.path.is_ident("code") {
@@ -189,6 +203,8 @@ fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
                 code = Some(m.value()?.parse::<LitStr>()?);
             } else if m.path.is_ident("transparent") {
                 classes.push(ClassSource::Transparent);
+            } else if m.path.is_ident("catalog") {
+                catalog = true;
             } else if m.path.is_ident("class_with") {
                 classes.push(ClassSource::With(m.value()?.parse::<Path>()?));
             } else if m.path.is_ident("class") {
@@ -219,6 +235,12 @@ fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
         return Err(syn::Error::new(v.ident.span(), "exactly one class source"));
     }
     let class = classes.pop().unwrap();
+    if catalog && !matches!(class, ClassSource::Transparent) {
+        return Err(syn::Error::new(
+            v.ident.span(),
+            "catalog is only valid on transparent variants",
+        ));
+    }
     match (&class, &code) {
         (ClassSource::Transparent, Some(c)) => {
             return Err(syn::Error::new(
@@ -246,6 +268,7 @@ fn parse_variant(v: &syn::Variant) -> syn::Result<VariantSpec> {
         http,
         mcp,
         acp,
+        catalog,
     })
 }
 

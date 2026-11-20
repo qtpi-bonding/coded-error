@@ -41,7 +41,7 @@ Only sqlx 0.7 is supported. The `concord.` code prefix is reserved for
 
 ## Code catalog
 
-`#[derive(CodedError)]` also implements `CodeCatalog`, whose `CODES` const lists a `CodeEntry { code, class }` per variant in declaration order, reachable through a generic bound (`fn codes<E: CodeCatalog>()`). Variants whose class is computed at runtime (`from(field)`, `class_with`) or forwarded (`transparent`) are omitted, since no static class exists for them.
+`#[derive(CodedError)]` also implements `CodeCatalog`, whose `codes()` returns a `CodeEntry { code, class }` per variant in declaration order, reachable through a generic bound (`fn f<E: CodeCatalog>()`). `class` is `None` when decided at runtime (`from(field)`, `class_with`). `#[coded(transparent, catalog)]` forwards the inner type's entries (which must implement `CodeCatalog`), de-duplicated by code, first wins; a transparent variant without `catalog` contributes nothing.
 
 ## Code grammar
 

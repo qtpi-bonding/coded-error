@@ -113,6 +113,13 @@ fn all_codes_lists_own_codes_only() {
 mod catalog {
     use coded_error::{CodeCatalog, CodeEntry, CodedError, ErrorClass};
 
+    fn with_class(e: &CatalogError) -> ErrorClass {
+        match e {
+            CatalogError::Custom => ErrorClass::Transient,
+            _ => ErrorClass::Unknown,
+        }
+    }
+
     #[derive(Debug, thiserror::Error, CodedError)]
     #[coded(namespace = "test.catalog")]
     pub enum CatalogError {
@@ -128,21 +135,43 @@ mod catalog {
         #[error("dyn")]
         #[coded(code = "dynamic", class = from(0))]
         Dynamic(super::FailureKind),
+        #[error("custom")]
+        #[coded(code = "custom", class_with = with_class)]
+        Custom,
     }
 
-    fn codes<E: CodeCatalog>() -> &'static [CodeEntry] {
-        E::CODES
+    #[derive(Debug, thiserror::Error, CodedError)]
+    #[coded(namespace = "test.outer")]
+    pub enum Outer {
+        #[error("own")]
+        #[coded(code = "own", class = Logical)]
+        Own,
+        #[error(transparent)]
+        #[coded(transparent, catalog)]
+        Inner(CatalogError),
+        #[error(transparent)]
+        #[coded(transparent, catalog)]
+        InnerAgain(CatalogError),
+        #[error(transparent)]
+        #[coded(transparent)]
+        Plain(std::io::Error),
+    }
+
+    fn codes<E: CodeCatalog>() -> Vec<CodeEntry> {
+        E::codes()
     }
 
     #[test]
-    fn catalog_lists_static_variants_in_order() {
+    fn catalog_lists_all_variants_in_order() {
         let e = |code, class| CodeEntry { code, class };
         assert_eq!(
             codes::<CatalogError>(),
-            &[
-                e("test.catalog.missing", ErrorClass::Logical),
-                e("test.catalog.disk", ErrorClass::Infrastructure),
-                e("test.catalog.busy", ErrorClass::Transient),
+            vec![
+                e("test.catalog.missing", Some(ErrorClass::Logical)),
+                e("test.catalog.disk", Some(ErrorClass::Infrastructure)),
+                e("test.catalog.busy", Some(ErrorClass::Transient)),
+                e("test.catalog.dynamic", None),
+                e("test.catalog.custom", None),
             ]
         );
     }
@@ -153,14 +182,35 @@ mod catalog {
             CatalogError::Missing,
             CatalogError::Disk(String::new()),
             CatalogError::Busy { retry: 1 },
+            CatalogError::Dynamic(super::FailureKind::Logical),
+            CatalogError::Custom,
         ];
-        assert_eq!(
-            CatalogError::Dynamic(super::FailureKind::Logical).class(),
-            ErrorClass::Logical
-        );
-        for (entry, v) in <CatalogError as CodeCatalog>::CODES.iter().zip(&values) {
+        for (entry, v) in codes::<CatalogError>().iter().zip(&values) {
             assert_eq!(entry.code, v.code());
-            assert_eq!(entry.class, v.class());
+            if let Some(c) = entry.class {
+                assert_eq!(c, v.class());
+            }
         }
+    }
+
+    #[test]
+    fn transparent_catalog_forwards_and_dedups() {
+        let got = codes::<Outer>();
+        let names: Vec<_> = got.iter().map(|e| e.code).collect();
+        assert_eq!(
+            names,
+            [
+                "test.outer.own",
+                "test.catalog.missing",
+                "test.catalog.disk",
+                "test.catalog.busy",
+                "test.catalog.dynamic",
+                "test.catalog.custom"
+            ]
+        );
+        let mut u = names.clone();
+        u.sort();
+        u.dedup();
+        assert_eq!(u.len(), names.len());
     }
 }

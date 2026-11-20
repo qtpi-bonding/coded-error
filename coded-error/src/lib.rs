@@ -67,16 +67,27 @@ pub trait CodedError: std::error::Error {
 pub struct CodeEntry {
     /// The stable, namespaced error code.
     pub code: &'static str,
-    /// The class of the variant that returns this code.
-    pub class: ErrorClass,
+    /// The variant's class, or `None` when it is decided at runtime.
+    pub class: Option<ErrorClass>,
 }
 
 /// Every code an error type can return, reachable through a generic bound.
-/// Derived by `#[derive(CodedError)]`; variants with a transparent or
-/// runtime-computed class (`from(field)`, `class_with`) are omitted.
+/// Derived by `#[derive(CodedError)]`.
 pub trait CodeCatalog {
-    /// One entry per statically classified variant, in declaration order.
-    const CODES: &'static [CodeEntry];
+    /// One entry per variant in declaration order; `#[coded(transparent, catalog)]`
+    /// variants splice in the inner type's entries. De-duplicated by code.
+    fn codes() -> Vec<CodeEntry>;
+}
+
+#[doc(hidden)]
+pub fn dedup_entries(entries: Vec<CodeEntry>) -> Vec<CodeEntry> {
+    let mut out: Vec<CodeEntry> = Vec::with_capacity(entries.len());
+    for e in entries {
+        if !out.iter().any(|o| o.code == e.code) {
+            out.push(e);
+        }
+    }
+    out
 }
 
 /// The facts every boundary mapping works from.
