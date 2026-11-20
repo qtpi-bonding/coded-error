@@ -62,6 +62,23 @@ pub trait CodedError: std::error::Error {
     }
 }
 
+/// One code an error type can return, with its class.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CodeEntry {
+    /// The stable, namespaced error code.
+    pub code: &'static str,
+    /// The class of the variant that returns this code.
+    pub class: ErrorClass,
+}
+
+/// Every code an error type can return, reachable through a generic bound.
+/// Derived by `#[derive(CodedError)]`; variants with a transparent or
+/// runtime-computed class (`from(field)`, `class_with`) are omitted.
+pub trait CodeCatalog {
+    /// One entry per statically classified variant, in declaration order.
+    const CODES: &'static [CodeEntry];
+}
+
 /// The facts every boundary mapping works from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Facts {

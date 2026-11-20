@@ -69,6 +69,7 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     let mut class_arms = Vec::new();
     let mut override_arms = Vec::new();
     let mut all_codes = Vec::new();
+    let mut catalog = Vec::new();
     let mut asserts = Vec::new();
 
     for s in &specs {
@@ -108,6 +109,13 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
                 );
                 asserts.push(quote! { const _: () = ::core::assert!(::coded_error::is_valid_code(#full_code), #msg); });
                 all_codes.push(full_code.clone());
+                // Only a fixed class is static; from(field) / class_with are
+                // computed at runtime, so those variants stay out of CODES.
+                if let ClassSource::Fixed(c) = other {
+                    catalog.push(quote! {
+                        ::coded_error::CodeEntry { code: #full_code, class: ::coded_error::ErrorClass::#c }
+                    });
+                }
                 let wild = wildcard_pattern(v, &s.fields);
                 code_arms.push(quote! { #wild => #full_code });
                 override_arms.push(quote! { #wild => #own });
@@ -136,6 +144,9 @@ pub fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         }
         impl #impl_g #name #ty_g #where_g {
             pub const ALL_CODES: &'static [&'static str] = &[#(#all_codes),*];
+        }
+        impl #impl_g ::coded_error::CodeCatalog for #name #ty_g #where_g {
+            const CODES: &'static [::coded_error::CodeEntry] = &[#(#catalog),*];
         }
     })
 }

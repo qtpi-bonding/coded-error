@@ -109,3 +109,58 @@ fn all_codes_lists_own_codes_only() {
     );
     coded_error::check_codes("test.action.", &[ActionError::ALL_CODES]).unwrap();
 }
+
+mod catalog {
+    use coded_error::{CodeCatalog, CodeEntry, CodedError, ErrorClass};
+
+    #[derive(Debug, thiserror::Error, CodedError)]
+    #[coded(namespace = "test.catalog")]
+    pub enum CatalogError {
+        #[error("missing")]
+        #[coded(code = "missing", class = Logical)]
+        Missing,
+        #[error("disk {0}")]
+        #[coded(code = "disk", class = Infrastructure)]
+        Disk(String),
+        #[error("busy")]
+        #[coded(code = "busy", class = Transient)]
+        Busy { retry: u32 },
+        #[error("dyn")]
+        #[coded(code = "dynamic", class = from(0))]
+        Dynamic(super::FailureKind),
+    }
+
+    fn codes<E: CodeCatalog>() -> &'static [CodeEntry] {
+        E::CODES
+    }
+
+    #[test]
+    fn catalog_lists_static_variants_in_order() {
+        let e = |code, class| CodeEntry { code, class };
+        assert_eq!(
+            codes::<CatalogError>(),
+            &[
+                e("test.catalog.missing", ErrorClass::Logical),
+                e("test.catalog.disk", ErrorClass::Infrastructure),
+                e("test.catalog.busy", ErrorClass::Transient),
+            ]
+        );
+    }
+
+    #[test]
+    fn catalog_matches_code_and_class() {
+        let values = [
+            CatalogError::Missing,
+            CatalogError::Disk(String::new()),
+            CatalogError::Busy { retry: 1 },
+        ];
+        assert_eq!(
+            CatalogError::Dynamic(super::FailureKind::Logical).class(),
+            ErrorClass::Logical
+        );
+        for (entry, v) in <CatalogError as CodeCatalog>::CODES.iter().zip(&values) {
+            assert_eq!(entry.code, v.code());
+            assert_eq!(entry.class, v.class());
+        }
+    }
+}
